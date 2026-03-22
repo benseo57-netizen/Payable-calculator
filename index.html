@@ -763,7 +763,7 @@ const DI_COLOR  = { 직접: { bg:"#134E4A", fg:"#5EEAD4" }, 간접: { bg:"#1E3A8
 const FS_COLOR  = { 매출원가: { bg:"#1E3A5F", fg:"#7DD3FC" }, 판관비: { bg:"#713F12", fg:"#FCD34D" }, 영업외: { bg:"#3B0764", fg:"#E879F9" } };
 const PROC_COLOR= { 전처리: { bg:"#0F2040", fg:"#38BDF8" }, 습식: { bg:"#0A2000", fg:"#4ADE80" }, 공통: { bg:"#1C1020", fg:"#C4B5FD" }, "—": { bg:"#1E293B", fg:"#64748B" } };
 
-const Tag = ({ label, map }) => {
+const CostTag = ({ label, map }) => {
   const d = map[label] || { bg:"#1E293B", fg:"#64748B" };
   return (
     <span style={{ fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:4,
@@ -892,10 +892,10 @@ function CostMapApp() {
               <div style={{ fontSize:12, color:"#E2E8F0" }}>{c.label}</div>
               {c.note && <div style={{ fontSize:9, color:"#334155", marginTop:2 }}>{c.note}</div>}
             </div>
-            <div style={{ textAlign:"center", paddingTop:2 }}><Tag label={c.vf} map={VF_COLOR} /></div>
-            <div style={{ textAlign:"center", paddingTop:2 }}><Tag label={c.di} map={DI_COLOR} /></div>
-            <div style={{ textAlign:"center", paddingTop:2 }}><Tag label={c.fs} map={FS_COLOR} /></div>
-            <div style={{ textAlign:"center", paddingTop:2 }}><Tag label={c.proc} map={PROC_COLOR} /></div>
+            <div style={{ textAlign:"center", paddingTop:2 }}><CostTag label={c.vf} map={VF_COLOR} /></div>
+            <div style={{ textAlign:"center", paddingTop:2 }}><CostTag label={c.di} map={DI_COLOR} /></div>
+            <div style={{ textAlign:"center", paddingTop:2 }}><CostTag label={c.fs} map={FS_COLOR} /></div>
+            <div style={{ textAlign:"center", paddingTop:2 }}><CostTag label={c.proc} map={PROC_COLOR} /></div>
           </div>
         ))}
 
@@ -940,22 +940,23 @@ function CostMapApp() {
 
 
 function App() {
-  const [tab, setTab] = React.useState(0);
+  const [mainTab, setMainTab] = useState(0);
   return (
-    <div style={{ fontFamily:"'Apple SD Gothic Neo',Arial,sans-serif", background:"#060E1C", minHeight:"100vh" }}>
-      <div style={{ display:"flex", background:"#0A1628", borderBottom:"1px solid #0F172A",
+    <div style={{ margin:0, padding:0 }}>
+      <div style={{ display:"flex", background:"#0A1628",
+        borderBottom:"1px solid #0F172A",
         position:"sticky", top:0, zIndex:100 }}>
-        {["계산기","원가 분류 참고"].map((t,i) => (
-          <button key={i} onClick={() => setTab(i)} style={{
+        {["📊  계산기","📚  원가 분류 참고"].map((t,i) => (
+          <button key={i} onClick={() => setMainTab(i)} style={{
             padding:"12px 24px", fontSize:12, fontWeight:700, cursor:"pointer",
             border:"none", background:"transparent",
-            color:tab===i?"#F59E0B":"#334155",
-            borderBottom:tab===i?"2px solid #F59E0B":"2px solid transparent"
+            color:mainTab===i?"#F59E0B":"#334155",
+            borderBottom:mainTab===i?"2px solid #F59E0B":"2px solid transparent"
           }}>{t}</button>
         ))}
       </div>
-      {tab === 0 && <CalcApp />}
-      {tab === 1 && <div style={{ padding:20 }}><CostMapApp /></div>}
+      {mainTab === 0 && <CalcApp />}
+      {mainTab === 1 && <div style={{ padding:20 }}><CostMapApp /></div>}
     </div>
   );
 }
