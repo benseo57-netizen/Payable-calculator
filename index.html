@@ -87,10 +87,10 @@ const C = {
 };
 
 const TAGS = {
-  변동:   { bg: "#14532D", fg: "#4ADE80" },
-  고정:   { bg: "#4C1D95", fg: "#A78BFA" },
-  매출원가: { bg: "#1E3A8A", fg: "#93C5FD" },
-  직접:   { bg: "#134E4A", fg: "#5EEAD4" },
+  변동:    { bg: "#14532D", fg: "#4ADE80" },
+  고정:    { bg: "#4C1D95", fg: "#A78BFA" },
+  직접경비: { bg: "#134E4A", fg: "#5EEAD4" },
+  간접경비: { bg: "#1E3A8A", fg: "#93C5FD" },
 };
 
 function Tag({ t }) {
@@ -361,33 +361,33 @@ function App() {
                   ₩/kg-제품 기준 · 고정비(감가·고정인건비) 제외
                 </div>
                 <IRow label="Co 습식가공비" value={inp.coWetCost} onChange={s("coWetCost")} unit="₩/kg"
-                  tags={["변동", "매출원가", "직접"]} accent />
+                  tags={["변동", "직접경비"]} accent />
                 <IRow label="Ni 습식가공비" value={inp.niWetCost} onChange={s("niWetCost")} unit="₩/kg"
-                  tags={["변동", "매출원가", "직접"]} accent />
+                  tags={["변동", "직접경비"]} accent />
                 <IRow label="Li₂CO₃ 습식가공비" value={inp.liWetCost} onChange={s("liWetCost")} unit="₩/kg"
-                  tags={["변동", "매출원가", "직접"]} accent />
+                  tags={["변동", "직접경비"]} accent />
                 <CRow label="총 습식가공비 (원료 kg당)" value={f0(c.wetTotal)} unit="₩/kg"
                   color={C.purple} bold
                   formula={"Co_out×Co가공비 + Ni_out×Ni가공비 + Li_out×Li가공비\nCo_out = Co함량×분말화×Co회수율\n= " + inp.coContent + "% × " + inp.powderRatio + "% × " + inp.coRecovery + "% = " + (c.coOutKg*1000).toFixed(2) + " g/kg"} />
 
                 <Sec label="⑥ 물류 · 소성 · 기타 변동비" color={C.red} />
                 <IRow label="전처리 변동비" value={inp.preProcessCost} onChange={s("preProcessCost")} unit="₩/kg"
-                  tags={["변동", "매출원가", "직접"]}
+                  tags={["변동", "직접경비"]}
                   note="₩/kg-스크랩 기준 · BM 직매입=0" accent />
                 <IRow label="로컬 물류비" value={inp.localLogistics} onChange={s("localLogistics")} unit="₩/kg"
-                  tags={["변동", "매출원가", "직접"]}
+                  tags={["변동", "간접경비"]}
                   note="₩/kg-입력원료 기준 · 스크랩/BM 무관 · 그대로 적용"
                   formula="스크랩이면 스크랩 kg당, BM이면 BM kg당 입력" />
                 <IRow label="국제 운임 (CIF 부산)" value={inp.intlLogistics} onChange={s("intlLogistics")} unit="₩/kg-BM"
-                  tags={["변동", "매출원가", "직접"]}
+                  tags={["변동", "간접경비"]}
                   note="₩/kg-BM 기준 · 해외→부산 · 불필요시 0"
                   formula={"예) 컨테이너 $5,000 ÷ BM 20,000kg = $0.25/kg-BM\n자동환산: ×분말화비율 (BM 발생량 반영)"} />
                 <IRow label="한국 로컬 (부산→군산)" value={inp.krLocalLogistics} onChange={s("krLocalLogistics")} unit="₩/kg-BM"
-                  tags={["변동", "매출원가", "직접"]}
+                  tags={["변동", "간접경비"]}
                   note="₩/kg-BM 기준 · 불필요시 0"
                   formula="자동환산: ×분말화비율" />
                 <IRow label="소성비용 (군산)" value={inp.calcinationCost} onChange={s("calcinationCost")} unit="₩/kg-BM"
-                  tags={["변동", "매출원가", "직접"]}
+                  tags={["변동", "직접경비"]}
                   note="₩/kg-BM 기준 · BM 전용 · 불필요시 0"
                   formula="자동환산: ×분말화비율" />
                 <IRow label="기타 변동비" value={inp.otherVarCost} onChange={s("otherVarCost")} unit="₩/kg"
@@ -417,19 +417,19 @@ function App() {
                 {/* 변동비 */}
                 <Sec label="변동비 합계" color={C.red} />
                 <CRow label="전처리 변동비" value={"-" + f0(c.preV)} unit="₩/kg" color="#FCA5A5"
-                  tags={["변동", "매출원가", "직접"]} />
+                  tags={["변동", "직접경비"]} />
                 <CRow label="습식가공비" value={"-" + f0(c.wetTotal)} unit="₩/kg" color="#FCA5A5"
-                  tags={["변동", "매출원가", "직접"]} />
+                  tags={["변동", "직접경비"]} />
                 <CRow label="로컬 물류비" value={"-" + f0(c.localV)} unit="₩/kg" color="#FCA5A5"
-                  tags={["변동", "매출원가", "직접"]} />
+                  tags={["변동", "간접경비"]} />
                 <CRow label="국제 운임" value={"-" + f0(c.intlV * c.pr)} unit="₩/kg" color="#FCA5A5"
-                  tags={["변동", "매출원가", "직접"]}
+                  tags={["변동", "간접경비"]}
                   formula={"국제운임(₩/kg-BM) × 분말화비율\n= " + f0(c.intlV) + " × " + (c.pr*100).toFixed(0) + "% = " + f0(c.intlV * c.pr)} />
                 <CRow label="한국 로컬" value={"-" + f0(c.krLocalV * c.pr)} unit="₩/kg" color="#FCA5A5"
-                  tags={["변동", "매출원가", "직접"]}
+                  tags={["변동", "간접경비"]}
                   formula={"한국로컬(₩/kg-BM) × 분말화비율\n= " + f0(c.krLocalV) + " × " + (c.pr*100).toFixed(0) + "% = " + f0(c.krLocalV * c.pr)} />
                 <CRow label="소성비용" value={"-" + f0(c.calcV * c.pr)} unit="₩/kg" color="#FCA5A5"
-                  tags={["변동", "매출원가", "직접"]}
+                  tags={["변동", "직접경비"]}
                   formula={"소성비(₩/kg-BM) × 분말화비율\n= " + f0(c.calcV) + " × " + (c.pr*100).toFixed(0) + "% = " + f0(c.calcV * c.pr)} />
                 <CRow label="기타 변동비" value={"-" + f0(c.otherV)} unit="₩/kg" color="#FCA5A5"
                   tags={["변동"]} />
@@ -633,15 +633,15 @@ function App() {
 
                 <Sec label="② 비용 입력 (1시트 연동 · 수정 가능)" color={C.red} />
                 <IRow label="전처리 변동비" value={inp.preProcessCost} onChange={s("preProcessCost")} unit="₩/kg"
-                  tags={["변동", "매출원가", "직접"]} note="₩/kg-스크랩" />
+                  tags={["변동", "직접경비"]} note="₩/kg-스크랩" />
                 <IRow label="로컬 물류비" value={inp.localLogistics} onChange={s("localLogistics")} unit="₩/kg"
-                  tags={["변동", "매출원가", "직접"]} note="₩/kg-입력원료" />
+                  tags={["변동", "간접경비"]} note="₩/kg-입력원료" />
                 <IRow label="국제 운임" value={inp.intlLogistics} onChange={s("intlLogistics")} unit="₩/kg-BM"
-                  tags={["변동", "매출원가", "직접"]} note="₩/kg-BM · 자동환산 ×분말화비율" />
+                  tags={["변동", "간접경비"]} note="₩/kg-BM · 자동환산 ×분말화비율" />
                 <IRow label="한국 로컬 (부산→군산)" value={inp.krLocalLogistics} onChange={s("krLocalLogistics")} unit="₩/kg-BM"
-                  tags={["변동", "매출원가", "직접"]} note="₩/kg-BM · 자동환산 ×분말화비율" />
+                  tags={["변동", "간접경비"]} note="₩/kg-BM · 자동환산 ×분말화비율" />
                 <IRow label="소성비용" value={inp.calcinationCost} onChange={s("calcinationCost")} unit="₩/kg-BM"
-                  tags={["변동", "매출원가", "직접"]} note="₩/kg-BM · 자동환산 ×분말화비율" />
+                  tags={["변동", "직접경비"]} note="₩/kg-BM · 자동환산 ×분말화비율" />
                 <IRow label="기타 변동비" value={inp.otherVarCost} onChange={s("otherVarCost")} unit="₩/kg"
                   tags={["변동"]} />
                 <CRow label="비용 소계 (습식 제외)" unit="₩/kg"
