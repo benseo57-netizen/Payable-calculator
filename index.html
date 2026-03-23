@@ -32,6 +32,7 @@ function compute(inp) {
   const coC = num(inp.coContent) / 100;
   const niC = num(inp.niContent) / 100;
   const liC = num(inp.liContent) / 100;
+  // 회수 후 output (변동 가공비 계산 기준)
   const coOut = coC * pr * cor;
   const niOut = niC * pr * nir;
   const liOut = liC * LI_CONV * pr * lir;
@@ -39,6 +40,14 @@ function compute(inp) {
   const niVal = niOut * niP;
   const liVal = liOut * liP;
   const totOut  = coVal + niVal + liVal;
+
+  // 함량 기준 가치 (contained value, 회수율 미적용 — Payable Rate 분모)
+  const coContained  = coC * pr * coP;
+  const niContained  = niC * pr * niP;
+  const liContained  = liC * LI_CONV * pr * liP;
+  const coNiContained  = coContained + niContained;
+  const totContained   = coContained + niContained + liContained;
+  // 하위 호환용 (output 표시용)
   const coNiOut = coVal + niVal;
   const wetTotal = coOut * num(inp.coWetCost) + niOut * num(inp.niWetCost) + liOut * num(inp.liWetCost);
   const preV    = num(inp.preProcessCost);
@@ -49,10 +58,12 @@ function compute(inp) {
   const otherV  = num(inp.otherVarCost);
   const totVar  = preV + wetTotal + localV + intlV*pr + krV*pr + calcV*pr + otherV;
   const payable = totOut - totVar;
-  const ratioCoNi   = coNiOut > 0 ? (payable / coNiOut) * 100 : NaN;
-  const ratioCoNiLi = totOut  > 0 ? (payable / totOut)  * 100 : NaN;
+  // Payable Rate = payable ÷ 함량가치 (시장 관행: contained value 기준)
+  const ratioCoNi   = coNiContained > 0 ? (payable / coNiContained) * 100 : NaN;
+  const ratioCoNiLi = totContained  > 0 ? (payable / totContained)  * 100 : NaN;
   const mktRatio    = num(inp.marketRatioCoNi);
-  const marketPrice = coNiOut * (mktRatio / 100);
+  // 시장 매입단가 = 함량가치 × 시장 Rate (contained value 기준)
+  const marketPrice = coNiContained * (mktRatio / 100);
   const cmKg        = payable - marketPrice;
   const vol         = num(inp.monthlyVolume);
   const fixedCost   = num(inp.monthlyFixedCost) * 1e8;
@@ -67,6 +78,7 @@ function compute(inp) {
   return {
     coP, niP, liP, pr, coOut, niOut, liOut,
     coVal, niVal, liVal, totOut, coNiOut,
+    coContained, niContained, liContained, coNiContained, totContained,
     wetTotal, preV, localV, intlV, krV, calcV, otherV, totVar,
     payable, ratioCoNi, ratioCoNiLi,
     mktRatio, marketPrice, cmKg, cmMon, fixedCost, fixedPerKg, covPct,
@@ -75,13 +87,13 @@ function compute(inp) {
 }
 
 const C = {
-  bg:"#060E1C", card:"#0A1628", border:"#0F172A",
-  amber:"#F59E0B", blue:"#38BDF8", green:"#4ADE80",
-  red:"#F87171", purple:"#A78BFA", muted:"#475569", dim:"#334155", vdim:"#1E3A5F",
+  bg:"#0D1B2E", card:"#152035", border:"#1E3050",
+  amber:"#FBB724", blue:"#38BDF8", green:"#34D399",
+  red:"#F87171", purple:"#C4B5FD", muted:"#94A3B8", dim:"#64748B", vdim:"#334155",
 };
 
 const TAGS = {
-  변동:    { bg:"#14532D", fg:"#4ADE80" },
+  변동:    { bg:"#166534", fg:"#4ADE80" },
   직접경비: { bg:"#134E4A", fg:"#5EEAD4" },
   간접경비: { bg:"#1E3A8A", fg:"#93C5FD" },
 };
@@ -101,20 +113,20 @@ function Sec({ label, color }) {
   return (
     <div style={{ padding:"6px 12px", marginTop:8, fontSize:10, fontWeight:700,
       letterSpacing:"0.07em", color:color||C.amber,
-      borderLeft:"3px solid "+(color||C.amber), background:C.bg }}>
+      borderLeft:"3px solid "+(color||C.amber), background:"#111827" }}>
       {label}
     </div>
   );
 }
 
-function Fx({ text }) {
+function Fx({ id, text }) {
   const { openId, setOpenId } = useContext(FxCtx);
-  const open = openId === text;
+  const open = openId === id;
   return (
     <span style={{ display:"inline-flex", alignItems:"center", marginLeft:4, position:"relative" }}>
-      <button onClick={e => { e.stopPropagation(); setOpenId(open ? null : text); }}
+      <button onClick={e => { e.stopPropagation(); setOpenId(open ? null : id); }}
         style={{ fontSize:9, padding:"0 5px", borderRadius:3, cursor:"pointer",
-          background:open?"#1E3A8A":"#0F172A", color:open?"#93C5FD":C.dim,
+          background:open?"#1E3A8A":"#1E3050", color:open?"#93C5FD":C.dim,
           border:"1px solid "+(open?"#1E3A8A":C.border) }}>fx</button>
       {open && (
         <span onClick={e => e.stopPropagation()}
@@ -133,18 +145,18 @@ function IRow({ label, value, onChange, unit, note, tags, accent, highlight, for
   return (
     <div style={{ display:"flex", alignItems:"flex-start", gap:4,
       padding:"6px 10px", borderBottom:"1px solid "+C.border,
-      background:highlight?"#1A1020":accent?"#14203A":"transparent" }}>
+      background:highlight?"#1E1535":accent?"#162845":"transparent" }}>
       <div style={{ flex:1, minWidth:0 }}>
         <div style={{ display:"flex", alignItems:"center", flexWrap:"wrap", gap:2, position:"relative" }}>
           <span style={{ fontSize:11, color:"#94A3B8" }}>{label}</span>
           {tags && tags.map(t => <Tag key={t} t={t} />)}
-          {formula && <Fx text={formula} />}
+          {formula && <Fx id={label} text={formula} />}
         </div>
         {note && <div style={{ fontSize:9, color:C.vdim, marginTop:1 }}>{note}</div>}
       </div>
       <input type="number" step="any" value={value} onChange={e => onChange(e.target.value)}
         style={{ width:88, padding:"3px 7px", fontSize:12, textAlign:"right",
-          background:"#0A1628", color:"white", border:"1px solid #1E3A5F",
+          background:"#152035", color:"white", border:"1px solid #1E3A5F",
           borderRadius:4, outline:"none", flexShrink:0 }} />
       <div style={{ width:44, fontSize:10, color:C.dim, textAlign:"right", flexShrink:0, paddingTop:2 }}>{unit}</div>
     </div>
@@ -156,12 +168,12 @@ function CRow({ label, value, unit, bold, color, sub, tags, formula }) {
   return (
     <div style={{ display:"flex", alignItems:"flex-start", gap:4,
       padding:"5px 10px", borderBottom:"1px solid "+C.border,
-      background:bold?"#0A1E10":"transparent" }}>
+      background:bold?"#0D2215":"transparent" }}>
       <div style={{ flex:1, minWidth:0 }}>
         <div style={{ display:"flex", alignItems:"center", flexWrap:"wrap", gap:2, position:"relative" }}>
           <span style={{ fontSize:11, color:bold?"#86EFAC":C.muted, fontWeight:bold?700:400 }}>{label}</span>
           {tags && tags.map(t => <Tag key={t} t={t} />)}
-          {formula && <Fx text={formula} />}
+          {formula && <Fx id={label} text={formula} />}
         </div>
         {sub && <div style={{ fontSize:9, color:C.vdim, marginTop:1 }}>{sub}</div>}
       </div>
@@ -182,7 +194,7 @@ function LL({ text }) {
 
 function CardHdr({ text }) {
   return (
-    <div style={{ padding:"8px 12px", background:"#0A0F1A", fontSize:10,
+    <div style={{ padding:"8px 12px", background:"#111827", fontSize:10,
       fontWeight:800, color:"#94A3B8", letterSpacing:"0.08em",
       borderBottom:"1px solid "+C.border }}>
       {text}
@@ -245,7 +257,7 @@ function CopyBtn({ c, inp }) {
     <button onClick={handle} style={{
       margin:"8px 10px", width:"calc(100% - 20px)",
       padding:"10px 0", borderRadius:8, cursor:"pointer",
-      background:copied?"#14532D":"#0F2040",
+      background:copied?"#166534":"#0F2040",
       border:"1px solid "+(copied?"#4ADE80":"#1E3A5F"),
       color:copied?"#4ADE80":"#93C5FD",
       fontSize:12, fontWeight:700, fontFamily:"Arial",
@@ -385,19 +397,41 @@ function App() {
 
                 {/* 오른쪽: 결과 */}
                 <div style={{ background:C.card, borderRadius:10, overflow:"hidden", border:"1px solid "+C.border }}>
-                  <Sec label="Output 가치 (회수 후)" color={C.green} />
+                  {/* ── 회수 전: 함량가치 (Contained Value) ── */}
+                  <Sec label="회수 전 — 함량가치 (Contained Value, Payable Rate 분모)" color="#60A5FA" />
+                  <CRow label="Co 함량가치" value={f0(c.coContained)} unit="₩/kg"
+                    color="#93C5FD"
+                    sub={"함량 "+inp.coContent+"% × 분말화 "+inp.powderRatio+"% (회수율 미적용)"}
+                    formula={"Co함량×분말화×Co환산가 (회수율 미적용)\n= "+inp.coContent+"% × "+inp.powderRatio+"% × "+f0(c.coP)} />
+                  <CRow label="Ni 함량가치" value={f0(c.niContained)} unit="₩/kg"
+                    color="#93C5FD"
+                    sub={"함량 "+inp.niContent+"% × 분말화 "+inp.powderRatio+"% (회수율 미적용)"}
+                    formula={"Ni함량×분말화×Ni환산가 (회수율 미적용)\n= "+inp.niContent+"% × "+inp.powderRatio+"% × "+f0(c.niP)} />
+                  <CRow label="Li₂CO₃ 함량가치" value={f0(c.liContained)} unit="₩/kg"
+                    color="#93C5FD"
+                    sub={"함량 "+inp.liContent+"% × 5.323 × 분말화 (회수율 미적용)"}
+                    formula={"Li함량×5.323×분말화×Li₂CO₃환산가 (회수율 미적용)"} />
+                  <CRow label="Co+Ni 함량가치" value={f0(c.coNiContained)} unit="₩/kg" bold
+                    color="#60A5FA"
+                    sub="Payable Rate 분모 (일반시장 Co+Ni 기준)"
+                    formula="Co함량가치 + Ni함량가치" />
+                  <CRow label="전체 함량가치" value={f0(c.totContained)} unit="₩/kg"
+                    color="#60A5FA"
+                    sub="Payable Rate 분모 (중국 Co+Ni+Li 기준)"
+                    formula="Co+Ni+Li₂CO₃ 함량가치 합계" />
+
+                  {/* ── 회수 후: 실제 Output 가치 ── */}
+                  <Sec label="회수 후 — 실제 Output 가치 (Recovery Value)" color={C.green} />
                   <CRow label="Co 가치" value={f0(c.coVal)} unit="₩/kg"
-                    sub={"output "+(c.coOut*1000).toFixed(1)+" g/kg-원료"}
+                    sub={"output "+(c.coOut*1000).toFixed(1)+" g/kg · 회수율 "+inp.coRecovery+"%"}
                     formula={"Co함량×분말화×Co회수율×Co환산가\n= "+inp.coContent+"% × "+inp.powderRatio+"% × "+inp.coRecovery+"% × "+f0(c.coP)} />
                   <CRow label="Ni 가치" value={f0(c.niVal)} unit="₩/kg"
-                    sub={"output "+(c.niOut*1000).toFixed(1)+" g/kg-원료"}
+                    sub={"output "+(c.niOut*1000).toFixed(1)+" g/kg · 회수율 "+inp.niRecovery+"%"}
                     formula={"Ni함량×분말화×Ni회수율×Ni환산가\n= "+inp.niContent+"% × "+inp.powderRatio+"% × "+inp.niRecovery+"% × "+f0(c.niP)} />
                   <CRow label="Li₂CO₃ 가치" value={f0(c.liVal)} unit="₩/kg"
-                    sub={"output "+(c.liOut*1000).toFixed(1)+" g/kg-원료 (Li₂CO₃)"}
+                    sub={"output "+(c.liOut*1000).toFixed(1)+" g/kg · 회수율 "+inp.liRecovery+"%"}
                     formula={"Li함량×5.323×분말화×Li회수율×Li₂CO₃환산가\n= "+inp.liContent+"% × 5.323 × "+inp.powderRatio+"% × "+inp.liRecovery+"% × "+f0(c.liP)} />
-                  <CRow label="Output 합계" value={f0(c.totOut)} unit="₩/kg" bold formula="Co+Ni+Li₂CO₃가치" />
-                  <CRow label="Co+Ni 합계" value={f0(c.coNiOut)} unit="₩/kg" color="#6EE7B7"
-                    formula="Co+Ni가치 (Li 제외 — Payable Rate 분모)" />
+                  <CRow label="Output 합계 (회수 후)" value={f0(c.totOut)} unit="₩/kg" bold formula="Co+Ni+Li₂CO₃ 회수가치 합계" />
 
                   <Sec label="변동비 합계" color={C.red} />
                   <CRow label="전처리 변동비" value={"-"+f0(c.preV)} unit="₩/kg" color="#FCA5A5" tags={["변동","직접경비"]} />
@@ -413,14 +447,14 @@ function App() {
                   <CRow label="변동비 합계" value={"-"+f0(c.totVar)} unit="₩/kg" bold color={C.red}
                     formula="전처리+습식+로컬+국제+한국로컬+소성+기타" />
 
-                  <Sec label="Payable Rate — 변동비 기준 최대 허용 지급률 (상한선)" color={C.amber} />
+                  <Sec label="Payable Rate — 함량가치 대비 최대 허용 지급률 (상한선)" color={C.amber} />
                   <div style={{ margin:"6px 10px", padding:"12px 14px",
-                    background:"#14100A", border:"1px solid #92400E55", borderRadius:8 }}>
+                    background:"#1C1408", border:"1px solid #92400E55", borderRadius:8 }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
                       <div>
                         <div style={{ fontSize:11, fontWeight:700, color:C.amber }}>Co+Ni 기준 Payable Rate</div>
                         <div style={{ fontSize:9, color:C.dim }}>일반 시장 (국내·유럽·미국)</div>
-                        <div style={{ fontSize:9, color:"#334155" }}>= 매입단가 ÷ Co+Ni가치 (이 이상 주면 변동비 미회수)</div>
+                        <div style={{ fontSize:9, color:"#334155" }}>= 최대매입단가 ÷ Co+Ni 함량가치 (회수율 미적용 기준)</div>
                       </div>
                       <span style={{ fontSize:32, fontWeight:800, color:C.amber }}>{fp(c.ratioCoNi)}</span>
                     </div>
@@ -429,17 +463,17 @@ function App() {
                       <div>
                         <div style={{ fontSize:11, fontWeight:700, color:"#FCD34D" }}>Co+Ni+Li 기준 Payable Rate</div>
                         <div style={{ fontSize:9, color:C.dim }}>중국 기준</div>
-                        <div style={{ fontSize:9, color:"#334155" }}>= 매입단가 ÷ Output합계</div>
+                        <div style={{ fontSize:9, color:"#334155" }}>= 최대매입단가 ÷ Co+Ni+Li 함량가치</div>
                       </div>
                       <span style={{ fontSize:32, fontWeight:800, color:"#FCD34D" }}>{fp(c.ratioCoNiLi)}</span>
                     </div>
-                    <div style={{ padding:"7px 10px", background:"#0A0A0A", borderRadius:6,
+                    <div style={{ padding:"7px 10px", background:"#1A1A1A", borderRadius:6,
                       display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                       <div>
                         <div style={{ fontSize:9, fontWeight:600, color:"#475569" }}>매입단가 (₩/kg 환산)</div>
-                        <div style={{ fontSize:8, color:"#334155" }}>= Output합계 - 변동비합계</div>
+                        <div style={{ fontSize:8, color:"#334155" }}>= 회수Output - 변동비합계</div>
                       </div>
-                      <span style={{ fontSize:15, fontWeight:700, color:"#78350F" }}>{f0(c.payable)} ₩/kg</span>
+                      <span style={{ fontSize:15, fontWeight:700, color:"#92400E" }}>{f0(c.payable)} ₩/kg</span>
                     </div>
                   </div>
 
@@ -450,13 +484,13 @@ function App() {
                     note="입찰·협상 시 상대방 제시 지불률 입력"
                     formula="시장 매입단가 = Co+Ni가치 × 시장 Payable Rate%" />
                   <CRow label="시장 매입단가 (역산)" value={f0(c.marketPrice)} unit="₩/kg" color="#C4B5FD"
-                    sub={"Co+Ni "+f0(c.coNiOut)+" × "+inp.marketRatioCoNi+"%"}
-                    formula={"Co+Ni가치 × 시장 Rate\n= "+f0(c.coNiOut)+" × "+inp.marketRatioCoNi+"% = "+f0(c.marketPrice)} />
+                    sub={"Co+Ni 함량가치 "+f0(c.coNiContained)+" × "+inp.marketRatioCoNi+"%"}
+                    formula={"Co+Ni 함량가치 × 시장 Rate\n= "+f0(c.coNiContained)+" × "+inp.marketRatioCoNi+"% = "+f0(c.marketPrice)} />
 
                   <div style={{ margin:"4px 10px 0", padding:"10px 12px",
-                    background:"#0D1525", border:"1px solid #1E293B", borderRadius:8 }}>
+                    background:"#162035", border:"1px solid #1E293B", borderRadius:8 }}>
                     {[
-                      { label:"우리 최대 Rate (CM=0)", val:c.ratioCoNi||0, color:C.amber, fill:C.amber, lc:"#78350F" },
+                      { label:"우리 최대 Rate (CM=0)", val:c.ratioCoNi||0, color:C.amber, fill:C.amber, lc:"#92400E" },
                       { label:"시장 Payable Rate", val:num(inp.marketRatioCoNi), color:"#A78BFA", fill:"#7C3AED", lc:"#4C1D95" },
                     ].map((row,i) => {
                       const maxR = Math.max(c.ratioCoNi||0, num(inp.marketRatioCoNi), 100);
@@ -466,7 +500,7 @@ function App() {
                             <span style={{ fontSize:10, color:row.lc }}>{row.label}</span>
                             <span style={{ fontSize:13, fontWeight:800, color:row.color }}>{fp(row.val)}</span>
                           </div>
-                          <div style={{ height:10, background:"#0F172A", borderRadius:3, overflow:"hidden" }}>
+                          <div style={{ height:10, background:"#1E3050", borderRadius:3, overflow:"hidden" }}>
                             <div style={{ height:"100%", background:row.fill, borderRadius:3, transition:"width 0.5s",
                               width:Math.min(row.val/maxR*100,100)+"%" }} />
                           </div>
@@ -478,8 +512,8 @@ function App() {
                       return (
                         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
                           padding:"6px 8px", borderRadius:5,
-                          background:gap>=0?"#0A1E10":"#1A0A0A",
-                          border:"1px solid "+(gap>=0?"#14532D":"#7F1D1D") }}>
+                          background:gap>=0?"#0D2215":"#221010",
+                          border:"1px solid "+(gap>=0?"#166534":"#991B1B") }}>
                           <span style={{ fontSize:10, color:gap>=0?C.green:C.red }}>
                             {gap>=0
                               ? "우리 최대 Rate > 시장 Rate → 매입단가 차이(₩/kg) = CM"
@@ -523,7 +557,7 @@ function App() {
                   {num(inp.actualPrice) > 0 ? (
                     <div style={{ margin:"4px 10px 0" }}>
                       <div style={{ padding:"10px 14px", borderRadius:"8px 8px 0 0",
-                        background:c.fullMargin>=0?"#0A1E10":c.varMargin>=0?"#1C1200":"#1A0A0A",
+                        background:c.fullMargin>=0?"#0D2215":c.varMargin>=0?"#241800":"#221010",
                         border:"1px solid "+mCol+"55", borderBottom:"none" }}>
                         <div style={{ fontSize:12, fontWeight:800, color:mCol, marginBottom:3 }}>
                           {c.fullMargin>=0 ? "✅ 완전원가 기준으로도 흑자"
@@ -539,7 +573,7 @@ function App() {
                         </div>
                       </div>
                       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr",
-                        background:"#0F172A", border:"1px solid "+mCol+"55",
+                        background:"#1E3050", border:"1px solid "+mCol+"55",
                         borderTop:"none", overflow:"hidden" }}>
                         {[
                           { label:"변동비 기준 마진",
@@ -553,7 +587,7 @@ function App() {
                             sub:"변동비 기준 - 고정비 "+f0(c.fixedPerKg)+"₩/kg",
                             color:c.fullMargin>=0?C.green:C.red },
                         ].map((item,i) => (
-                          <div key={i} style={{ padding:"10px 12px", background:"#0A1628",
+                          <div key={i} style={{ padding:"10px 12px", background:"#152035",
                             borderLeft:i>0?"1px solid #0F172A":"none" }}>
                             <div style={{ fontSize:9, color:C.muted, marginBottom:4 }}>{item.label}</div>
                             <div style={{ display:"flex", alignItems:"baseline", gap:4 }}>
@@ -565,7 +599,7 @@ function App() {
                           </div>
                         ))}
                       </div>
-                      <div style={{ padding:"6px 12px", background:"#0A1220",
+                      <div style={{ padding:"6px 12px", background:"#0F1C30",
                         border:"1px solid "+mCol+"55", borderTop:"1px solid #0F172A",
                         borderRadius:"0 0 8px 8px",
                         display:"flex", justifyContent:"space-between", alignItems:"center" }}>
@@ -577,7 +611,7 @@ function App() {
                     </div>
                   ) : (
                     <div style={{ margin:"8px 10px", padding:"20px 14px",
-                      background:"#0A1220", borderRadius:8, border:"1px dashed #1E293B", textAlign:"center" }}>
+                      background:"#0F1C30", borderRadius:8, border:"1px dashed #1E293B", textAlign:"center" }}>
                       <div style={{ fontSize:28, marginBottom:6 }}>📊</div>
                       <div style={{ fontSize:11, color:C.muted, fontWeight:700 }}>실제 매입단가 입력 시</div>
                       <div style={{ fontSize:10, color:C.dim, marginTop:4 }}>
@@ -594,7 +628,7 @@ function App() {
                   <CardHdr text="판단 — 공헌이익(CM) 관점" />
                   <div style={{ margin:"4px 10px 10px" }}>
                     <div style={{ padding:"10px 14px", borderRadius:"8px 8px 0 0",
-                      background:sig==="green"?"#0A1E10":sig==="amber"?"#1C1200":"#1A0A0A",
+                      background:sig==="green"?"#0D2215":sig==="amber"?"#241800":"#221010",
                       border:"1px solid "+sigCol+"55", borderBottom:"none" }}>
                       <div style={{ fontSize:12, fontWeight:800, color:sigCol, marginBottom:4 }}>
                         {sig==="green" && "✅ 유휴 캐파 범위에서 이 딜이 고정비 부담 완화에 기여"}
@@ -608,14 +642,14 @@ function App() {
                       </div>
                     </div>
                     <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr",
-                      background:"#0F172A", border:"1px solid "+sigCol+"55",
+                      background:"#1E3050", border:"1px solid "+sigCol+"55",
                       borderTop:"none", overflow:"hidden" }}>
                       {[
                         { label:"kg당 CM",      value:f0(c.cmKg),       sub:"₩/kg",                       color:sigCol },
                         { label:"kg당 고정비",   value:f0(c.fixedPerKg), sub:"₩/kg · 월고정비÷가동량÷1,000", color:C.dim  },
                         { label:"이 딜 월 기여", value:fa(c.cmMon),      sub:"kg당CM × 가동량 × 1,000",      color:sigCol },
                       ].map((item,i) => (
-                        <div key={i} style={{ padding:"8px 10px", background:"#0A1628",
+                        <div key={i} style={{ padding:"8px 10px", background:"#152035",
                           borderLeft:i>0?"1px solid #0F172A":"none" }}>
                           <div style={{ fontSize:9, color:C.muted, marginBottom:3 }}>{item.label}</div>
                           <div style={{ fontSize:15, fontWeight:800, color:item.color }}>{item.value}</div>
@@ -623,7 +657,7 @@ function App() {
                         </div>
                       ))}
                     </div>
-                    <div style={{ padding:"8px 12px", background:"#0A1628",
+                    <div style={{ padding:"8px 12px", background:"#152035",
                       border:"1px solid "+sigCol+"55", borderTop:"1px solid #0F172A",
                       borderRadius:"0 0 8px 8px" }}>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5 }}>
@@ -638,10 +672,10 @@ function App() {
                       </div>
                       <div style={{ position:"relative", height:14, borderRadius:3,
                         overflow:"hidden", display:"flex", marginBottom:3 }}>
-                        <div style={{ flex:40, background:"#7F1D1D" }} />
-                        <div style={{ flex:40, background:"#78350F" }} />
-                        <div style={{ flex:20, background:"#14532D" }} />
-                        <div style={{ flex:20, background:"#0C4A6E" }} />
+                        <div style={{ flex:40, background:"#991B1B" }} />
+                        <div style={{ flex:40, background:"#92400E" }} />
+                        <div style={{ flex:20, background:"#166534" }} />
+                        <div style={{ flex:20, background:"#0E5A84" }} />
                         <div style={{ position:"absolute", top:0, bottom:0, width:3,
                           background:"white", boxShadow:"0 0 5px white",
                           left:Math.min(Math.max(c.covPct||0,0),120)/120*97+"%" }} />
@@ -660,7 +694,7 @@ function App() {
 
               </div>
 
-              <div style={{ marginTop:12, padding:"8px 14px", background:"#0A0F1A",
+              <div style={{ marginTop:12, padding:"8px 14px", background:"#111827",
                 borderRadius:6, fontSize:10, color:C.vdim, lineHeight:1.8 }}>
                 ⚠️ 습식가공비 = 변동분만 입력 (감가상각·고정인건비 제외) &nbsp;·&nbsp;
                 Li 함량은 Li 금속 기준 (Li₂CO₃ 환산계수 5.323 자동 적용) &nbsp;·&nbsp;
@@ -696,11 +730,11 @@ function App() {
 
                 <Sec label="③ 목표 Payable Rate 입력 (Co+Ni 기준)" color={C.amber} />
                 <div style={{ padding:"14px" }}>
-                  <div style={{ fontSize:10, color:"#78350F", marginBottom:8 }}>목표 Payable Rate 입력 → 목표 가공비 자동 역산</div>
+                  <div style={{ fontSize:10, color:"#92400E", marginBottom:8 }}>목표 Payable Rate 입력 → 목표 가공비 자동 역산</div>
                   <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                     <input type="number" step="any" value={tgt} onChange={e => setTgt(e.target.value)}
                       style={{ width:80, padding:"10px 8px", fontSize:24, fontWeight:800, textAlign:"center",
-                        background:"#0F172A", color:C.amber, border:"2px solid "+C.amber, borderRadius:8, outline:"none" }} />
+                        background:"#1E3050", color:C.amber, border:"2px solid "+C.amber, borderRadius:8, outline:"none" }} />
                     <span style={{ fontSize:24, fontWeight:800, color:C.amber }}>%</span>
                     <span style={{ fontSize:10, color:C.muted }}>Co+Ni 기준</span>
                   </div>
@@ -783,7 +817,7 @@ function App() {
                     });
                   })()}
                   <div style={{ display:"grid", gridTemplateColumns:"2fr 2fr 2fr 1.5fr", gap:2,
-                    padding:"6px 4px", background:"#0A1E10", borderRadius:"0 0 6px 6px", marginTop:2 }}>
+                    padding:"6px 4px", background:"#0D2215", borderRadius:"0 0 6px 6px", marginTop:2 }}>
                     <div style={{ fontSize:11, fontWeight:700, color:"#86EFAC" }}>합  계</div>
                     <div style={{ fontSize:11, fontWeight:700, color:"#94A3B8", textAlign:"right" }}>{f0(c.wetTotal)}</div>
                     <div style={{ fontSize:13, fontWeight:800, textAlign:"right",
@@ -799,7 +833,7 @@ function App() {
 
                 <Sec label="⑥ Payable Rate 요약" color={C.amber} />
                 <div style={{ margin:"6px 10px 10px", padding:"12px 14px",
-                  background:"#14100A", border:"1px solid #92400E44", borderRadius:8 }}>
+                  background:"#1C1408", border:"1px solid #92400E44", borderRadius:8 }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
                     paddingBottom:10, borderBottom:"1px solid #1C1508", marginBottom:10 }}>
                     <div>
