@@ -14,7 +14,7 @@
 const { useState, useContext, createContext } = React;
 
 const FxCtx = createContext({ openId: null, setOpenId: () => {} });
-const LI_CONV = 73.89 / (2 * 6.941);
+const LI_CONV = 1 / 0.188;  // Li₂CO₃ 환산: Li함량 ÷ 18.8% (Li₂CO₃ 내 Li 비율)
 const f0 = n => (n == null || isNaN(n) || !isFinite(n)) ? "—" : Math.round(n).toLocaleString("ko-KR");
 const fp = (n, d=1) => (n == null || isNaN(n) || !isFinite(n)) ? "—" : n.toFixed(d) + "%";
 const fa = n => (n == null || isNaN(n) || !isFinite(n)) ? "—" : (n / 1e8).toFixed(1) + "억";
@@ -22,7 +22,7 @@ const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
 
 function compute(inp) {
   const er  = num(inp.exchangeRate);
-  const coP = (num(inp.coUSD) / 0.453592) * er;
+  const coP = num(inp.coUSD) * 2.20462 * er;  // $/lb → ₩/kg (성일 기준: ×2.20462)
   const niP = (num(inp.niUSD) / 1000) * er;
   const liP = num(inp.liUSD) * er;
   const pr  = num(inp.powderRatio) / 100;
@@ -183,13 +183,13 @@ function IRow({ label, value, onChange, unit, note, tags, accent, highlight, for
         <div style={{ display:"flex", alignItems:"center", flexWrap:"wrap", gap:2, position:"relative" }}>
           <span style={{ fontSize:11, color:C.text, fontWeight:500 }}>{label}</span>
           {tags && tags.map(t => <Tag key={t} t={t} />)}
-          {formula && <Fx id={label} text={formula} />}
+          {formula && <Fx id={label+unit} text={formula} />}
         </div>
         {note && <div style={{ fontSize:9, color:C.muted, marginTop:2 }}>{note}</div>}
       </div>
       <input type="number" step="any" value={value} onChange={e => onChange(e.target.value)}
         style={{ width:88, padding:"3px 7px", fontSize:12, textAlign:"right",
-          background:"#FFFFFF", color:"white", border:"1px solid #1E3A5F",
+          background:"#FFFFFF", color:"#0F172A", border:"1.5px solid #94A3B8",
           borderRadius:4, outline:"none", flexShrink:0 }} />
       <div style={{ width:44, fontSize:10, color:C.dim, textAlign:"right", flexShrink:0, paddingTop:2 }}>{unit}</div>
     </div>
@@ -206,7 +206,7 @@ function CRow({ label, value, unit, bold, color, sub, tags, formula }) {
         <div style={{ display:"flex", alignItems:"center", flexWrap:"wrap", gap:2, position:"relative" }}>
           <span style={{ fontSize:11, color:bold?"#065F46":C.text, fontWeight:bold?700:400 }}>{label}</span>
           {tags && tags.map(t => <Tag key={t} t={t} />)}
-          {formula && <Fx id={label} text={formula} />}
+          {formula && <Fx id={label+unit} text={formula} />}
         </div>
         {sub && <div style={{ fontSize:9, color:C.muted, marginTop:1 }}>{sub}</div>}
       </div>
@@ -317,18 +317,18 @@ function App() {
     intlLogistics:"0", krLocalLogistics:"0",
     calcinationCost:"0", otherVarCost:"0",
     actualPrice:"0",
-    marketRatioCoNi:"88", monthlyVolume:"800", monthlyFixedCost:"70",
+    marketRatioCoNi:"88", monthlyVolume:"1350", monthlyFixedCost:"58",
   });
 
   const s = k => v => setInp(p => ({ ...p, [k]: v }));
   const c = compute(inp);
   const tgtNum      = num(tgt);
-  const tgtPayable  = c.coNiOut * (tgtNum / 100);
+  const tgtPayable  = c.coNiContained * (tgtNum / 100);
   const allowedWet  = c.totOut - tgtPayable
     - num(inp.preProcessCost) - num(inp.localLogistics)
     - num(inp.intlLogistics)*c.pr - num(inp.krLocalLogistics)*c.pr
     - num(inp.calcinationCost)*c.pr - num(inp.otherVarCost);
-  const tgtCoNiLi   = c.totOut > 0 ? (tgtPayable / c.totOut) * 100 : NaN;
+  const tgtCoNiLi   = c.totContained > 0 ? (tgtPayable / c.totContained) * 100 : NaN;
   const cmOk        = c.cmKg >= 0;
   const cmCol       = cmOk ? C.green : C.red;
   const sig         = c.cmKg < 0 ? "red" : c.cmKg < c.fixedPerKg ? "amber" : "green";
@@ -377,13 +377,13 @@ function App() {
                   <Sec label="② 금속 시세" color={C.blue} />
                   <IRow label="Co 시세" value={inp.coUSD} onChange={s("coUSD")} unit="$/lb" />
                   <CRow label="Co 환산가" value={f0(c.coP)} unit="₩/kg" color={C.blue}
-                    formula={"Co $/lb ÷ 0.453592 × 환율\n= "+inp.coUSD+" ÷ 0.453592 × "+inp.exchangeRate} />
+                    formula={"Co $/lb × 2.20462 × 환율\n= "+inp.coUSD+" $/lb × 2.20462 × "+inp.exchangeRate+" ₩/$"} />
                   <IRow label="Ni 시세" value={inp.niUSD} onChange={s("niUSD")} unit="$/ton" />
                   <CRow label="Ni 환산가" value={f0(c.niP)} unit="₩/kg" color={C.blue}
                     formula={"Ni $/ton ÷ 1,000 × 환율\n= "+inp.niUSD+" ÷ 1000 × "+inp.exchangeRate} />
                   <IRow label="Li₂CO₃ 시세" value={inp.liUSD} onChange={s("liUSD")} unit="$/kg" />
                   <CRow label="Li₂CO₃ 환산가" value={f0(c.liP)} unit="₩/kg" color={C.blue}
-                    formula={"Li $/kg × 환율\n= "+inp.liUSD+" × "+inp.exchangeRate} />
+                    formula={"Li₂CO₃ 시세 × 환율\n= "+inp.liUSD+" $/kg × "+inp.exchangeRate+" ₩/$\n※ Li함량은 Li 금속 기준 입력 → ÷18.8% 자동 환산"} />
 
                   <Sec label="③ 원료 분석" color={C.blue} />
                   <IRow label="분말화비율" value={inp.powderRatio} onChange={s("powderRatio")} unit="%"
@@ -392,12 +392,15 @@ function App() {
                   <IRow label="Co 함량" value={inp.coContent} onChange={s("coContent")} unit="%" />
                   <IRow label="Ni 함량" value={inp.niContent} onChange={s("niContent")} unit="%" />
                   <IRow label="Li 함량" value={inp.liContent} onChange={s("liContent")} unit="%"
-                    note="Li 금속 기준 (Li₂CO₃ 환산계수 5.323 자동 적용)" />
+                    note="Li 금속 기준 입력 (Li₂CO₃ 환산: ÷ 18.8% 자동 적용)" />
 
                   <Sec label="④ 습식 회수율" color={C.blue} />
-                  <IRow label="Co 회수율" value={inp.coRecovery} onChange={s("coRecovery")} unit="%" />
-                  <IRow label="Ni 회수율" value={inp.niRecovery} onChange={s("niRecovery")} unit="%" />
-                  <IRow label="Li₂CO₃ 회수율" value={inp.liRecovery} onChange={s("liRecovery")} unit="%" />
+                  <IRow label="Co 회수율" value={inp.coRecovery} onChange={s("coRecovery")} unit="%"
+                    formula={"Co 회수율: 습식공정에서 실제 회수되는 비율\n= 회수된 Co(kg) ÷ 투입 Co(kg) × 100\n성일 기준 약 95%"} />
+                  <IRow label="Ni 회수율" value={inp.niRecovery} onChange={s("niRecovery")} unit="%"
+                    formula={"Ni 회수율: 습식공정에서 실제 회수되는 비율\n= 회수된 Ni(kg) ÷ 투입 Ni(kg) × 100\n성일 기준 약 90%"} />
+                  <IRow label="Li₂CO₃ 회수율" value={inp.liRecovery} onChange={s("liRecovery")} unit="%"
+                    formula={"Li₂CO₃ 회수율: 습식공정에서 실제 회수되는 비율\n= 회수된 Li₂CO₃(kg) ÷ 투입 Li₂CO₃(kg) × 100\n성일 기준 약 90%"} />
 
                   <Sec label="⑤ 습식가공비 (변동분만)" color={C.purple} />
                   <div style={{ padding:"3px 10px", fontSize:9, color:"#7C3AED" }}>₩/kg-제품 기준 · 고정비(감가·고정인건비) 제외</div>
@@ -436,15 +439,15 @@ function App() {
                   <CRow label="Co 함량가치" value={f0(c.coContained)} unit="₩/kg"
                     color="#93C5FD"
                     sub={"함량 "+inp.coContent+"% × 분말화 "+inp.powderRatio+"% (회수율 미적용)"}
-                    formula={"Co함량×분말화×Co환산가 (회수율 미적용)\n= "+inp.coContent+"% × "+inp.powderRatio+"% × "+f0(c.coP)} />
+                    formula={"Co 환산가 = Co $/lb × 2.20462 × 환율\nCo 함량가치 = Co함량 × 분말화 × Co환산가 (회수율 미적용)\n= "+inp.coContent+"% × "+inp.powderRatio+"% × "+f0(c.coP)+" ₩/kg"} />
                   <CRow label="Ni 함량가치" value={f0(c.niContained)} unit="₩/kg"
                     color="#93C5FD"
                     sub={"함량 "+inp.niContent+"% × 분말화 "+inp.powderRatio+"% (회수율 미적용)"}
                     formula={"Ni함량×분말화×Ni환산가 (회수율 미적용)\n= "+inp.niContent+"% × "+inp.powderRatio+"% × "+f0(c.niP)} />
                   <CRow label="Li₂CO₃ 함량가치" value={f0(c.liContained)} unit="₩/kg"
                     color="#93C5FD"
-                    sub={"함량 "+inp.liContent+"% × 5.323 × 분말화 (회수율 미적용)"}
-                    formula={"Li함량×5.323×분말화×Li₂CO₃환산가 (회수율 미적용)"} />
+                    sub={"함량 "+inp.liContent+"% ÷ 18.8% × 분말화 (회수율 미적용)"}
+                    formula={"Li₂CO₃ = Li함량 ÷ 18.8%\n→ Li₂CO₃함량가치 = Li₂CO₃ × 분말화 × Li₂CO₃환산가 (회수율 미적용)"} />
                   <CRow label="Co+Ni 함량가치" value={f0(c.coNiContained)} unit="₩/kg" bold
                     color="#60A5FA"
                     sub="Payable Rate 분모 (일반시장 Co+Ni 기준)"
@@ -452,19 +455,19 @@ function App() {
                   <CRow label="전체 함량가치" value={f0(c.totContained)} unit="₩/kg"
                     color="#60A5FA"
                     sub="Payable Rate 분모 (중국 Co+Ni+Li 기준)"
-                    formula="Co+Ni+Li₂CO₃ 함량가치 합계" />
+                    formula="Co함량가치 + Ni함량가치 + Li함량가치\n※ Li: 입력 Li함량(%) ÷ 18.8% → Li₂CO₃ 환산 후 시세 적용" />
 
                   {/* ── 회수 후: 실제 Output 가치 ── */}
                   <Sec label="회수 후 — 실제 Output 가치 (Recovery Value)" color={C.green} />
                   <CRow label="Co 가치" value={f0(c.coVal)} unit="₩/kg"
                     sub={"output "+(c.coOut*1000).toFixed(1)+" g/kg · 회수율 "+inp.coRecovery+"%"}
-                    formula={"Co함량×분말화×Co회수율×Co환산가\n= "+inp.coContent+"% × "+inp.powderRatio+"% × "+inp.coRecovery+"% × "+f0(c.coP)} />
+                    formula={"Co 환산가 = Co $/lb × 2.20462 × 환율\nCo가치 = Co함량 × 분말화 × Co회수율 × Co환산가\n= "+inp.coContent+"% × "+inp.powderRatio+"% × "+inp.coRecovery+"% × "+f0(c.coP)+" ₩/kg"} />
                   <CRow label="Ni 가치" value={f0(c.niVal)} unit="₩/kg"
                     sub={"output "+(c.niOut*1000).toFixed(1)+" g/kg · 회수율 "+inp.niRecovery+"%"}
                     formula={"Ni함량×분말화×Ni회수율×Ni환산가\n= "+inp.niContent+"% × "+inp.powderRatio+"% × "+inp.niRecovery+"% × "+f0(c.niP)} />
                   <CRow label="Li₂CO₃ 가치" value={f0(c.liVal)} unit="₩/kg"
                     sub={"output "+(c.liOut*1000).toFixed(1)+" g/kg · 회수율 "+inp.liRecovery+"%"}
-                    formula={"Li함량×5.323×분말화×Li회수율×Li₂CO₃환산가\n= "+inp.liContent+"% × 5.323 × "+inp.powderRatio+"% × "+inp.liRecovery+"% × "+f0(c.liP)} />
+                    formula={"Li₂CO₃ = Li함량 ÷ 18.8%\n→ Li₂CO₃가치 = Li₂CO₃ × 분말화 × Li회수율 × Li₂CO₃환산가\n= "+inp.liContent+"% ÷ 18.8% × "+inp.powderRatio+"% × "+inp.liRecovery+"% × "+f0(c.liP)} />
                   <CRow label="Output 합계 (회수 후)" value={f0(c.totOut)} unit="₩/kg" bold formula="Co+Ni+Li₂CO₃ 회수가치 합계" />
 
                   <Sec label="변동비 합계" color={C.red} />
@@ -497,7 +500,7 @@ function App() {
                       <div>
                         <div style={{ fontSize:11, fontWeight:700, color:"#93C5FD" }}>Co+Ni+Li 기준 Payable Rate</div>
                         <div style={{ fontSize:9, color:C.dim }}>중국 기준</div>
-                        <div style={{ fontSize:9, color:"#64748B" }}>= 최대매입단가 ÷ Co+Ni+Li 함량가치</div>
+                        <div style={{ fontSize:9, color:"#94A3B8" }}>= 최대매입단가 ÷ Co+Ni+Li 함량가치</div>
                       </div>
                       <span style={{ fontSize:32, fontWeight:800, color:"#93C5FD" }}>{fp(c.ratioCoNiLi)}</span>
                     </div>
@@ -648,7 +651,7 @@ function App() {
                       background:"#F8FAFC", borderRadius:8, border:"1px dashed #1E293B", textAlign:"center" }}>
                       <div style={{ fontSize:28, marginBottom:6 }}>📊</div>
                       <div style={{ fontSize:11, color:C.muted, fontWeight:700 }}>실제 매입단가 입력 시</div>
-                      <div style={{ fontSize:10, color:C.dim, marginTop:4 }}>
+                      <div style={{ fontSize:10, color:"#CBD5E1", marginTop:4 }}>
                         변동비 기준 마진 · 완전원가 기준 마진 · 마진율 자동 표시
                       </div>
                     </div>
@@ -731,7 +734,7 @@ function App() {
               <div style={{ marginTop:12, padding:"8px 14px", background:"#F1F5F9",
                 borderRadius:6, fontSize:10, color:C.vdim, lineHeight:1.8 }}>
                 ⚠️ 습식가공비 = 변동분만 입력 (감가상각·고정인건비 제외) &nbsp;·&nbsp;
-                Li 함량은 Li 금속 기준 (Li₂CO₃ 환산계수 5.323 자동 적용) &nbsp;·&nbsp;
+                Li 함량은 Li 금속 기준 (Li₂CO₃ 환산: ÷ 18.8% 자동 적용) &nbsp;·&nbsp;
                 국제운임·한국로컬·소성비 = ₩/kg-BM 입력 → 분말화비율 자동 환산 &nbsp;·&nbsp;
                 Payable Rate = 변동비 기준 최대 허용 지급률(상한선)
               </div>
@@ -768,12 +771,12 @@ function App() {
                   <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                     <input type="number" step="any" value={tgt} onChange={e => setTgt(e.target.value)}
                       style={{ width:80, padding:"10px 8px", fontSize:24, fontWeight:800, textAlign:"center",
-                        background:"#FFFBEB", color:"#92400E", border:"2px solid #D97706", borderRadius:8, outline:"none" }} />
+                        background:"#FFFBEB", color:"#0F172A", border:"2px solid #D97706", borderRadius:8, outline:"none" }} />
                     <span style={{ fontSize:24, fontWeight:800, color:C.amber }}>%</span>
                     <span style={{ fontSize:10, color:C.muted }}>Co+Ni 기준</span>
                   </div>
                   <div style={{ fontSize:10, color:C.muted, marginTop:6 }}>
-                    목표 매입단가 = Co+Ni가치 × {tgtNum}% = {f0(tgtPayable)} ₩/kg
+                    목표 매입단가 = Co+Ni 함량가치 × {tgtNum}% = {f0(tgtPayable)} ₩/kg
                   </div>
                 </div>
               </div>
