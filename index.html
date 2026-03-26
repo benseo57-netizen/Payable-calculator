@@ -189,7 +189,7 @@ function IRow({ label, value, onChange, unit, note, tags, accent, highlight, for
         </div>
         {note && <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{note}</div>}
       </div>
-      <input type="number" step="any" value={value} onChange={e => onChange(e.target.value)}
+      <input type="number" step="any" value={value} onClick={e=>e.stopPropagation()} onChange={e => onChange(e.target.value)}
         style={{ width:88, padding:"3px 7px", fontSize:14, textAlign:"right",
           background:"#FFFFFF", color:"#0F172A", border:"1.5px solid #94A3B8",
           borderRadius:4, outline:"none", flexShrink:0 }} />
@@ -304,6 +304,334 @@ function CopyBtn({ c, inp }) {
   );
 }
 
+
+class Sheet3Boundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding:40, textAlign:"center", color:"#B91C1C" }}>
+          <div style={{ fontSize:18, fontWeight:700, marginBottom:12 }}>⚠ 3시트 렌더 오류</div>
+          <div style={{ fontSize:13, color:"#475569", fontFamily:"monospace",
+            background:"#F8FAFC", padding:16, borderRadius:8, textAlign:"left" }}>
+            {String(this.state.error)}
+          </div>
+          <button onClick={() => this.setState({ hasError:false, error:null })}
+            style={{ marginTop:16, padding:"8px 20px", background:"#1D4ED8",
+              color:"#fff", border:"none", borderRadius:6, cursor:"pointer" }}>
+            다시 시도
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function Sheet3Tab({ inp, s }) {
+  const er3  = num(inp.exchangeRate);
+  const coP3 = num(inp.coUSD) * 2.20462 * er3;
+  const niP3 = num(inp.niUSD) / 1000 * er3;
+  const liP3 = num(inp.liUSD) * er3;
+  const pr3  = num(inp.powderRatio) / 100;
+  const coC3 = num(inp.coContent) / 100;
+  const niC3 = num(inp.niContent) / 100;
+  const liC3 = num(inp.liContent) / 100;
+  const cor3 = num(inp.coRecovery) / 100;
+  const nir3 = num(inp.niRecovery) / 100;
+  const lir3 = num(inp.liRecovery) / 100;
+
+  const coCont3   = coC3 * pr3 * coP3;
+  const niCont3   = niC3 * pr3 * niP3;
+  const liCont3   = liC3 * LI_CONV * pr3 * liP3;
+  const coNiCont3 = coCont3 + niCont3;
+  const totCont3  = coNiCont3 + liCont3;
+
+  const coOut3  = coC3 * pr3 * cor3;
+  const niOut3  = niC3 * pr3 * nir3;
+  const liOut3  = liC3 * LI_CONV * pr3 * lir3;
+  const totOut3 = coOut3*coP3 + niOut3*niP3 + liOut3*liP3;
+
+  const wetTotal3  = coOut3*num(inp.coWetCost) + niOut3*num(inp.niWetCost) + liOut3*num(inp.liWetCost);
+  const preTreat3  = num(inp.s3PreTreat);
+  const logistics3 = num(inp.s3Logistics);
+  const totVar3    = wetTotal3 + preTreat3 + logistics3;
+  const maxPay3    = totOut3 - totVar3;
+
+  const tgtCoNi3 = num(inp.s3TargetCoNi);
+  const pool3    = coNiCont3 * (tgtCoNi3 / 100);
+  const cnliA3   = totCont3 > 0 ? Math.round(tgtCoNi3 * (coNiCont3/totCont3) * 100) / 100 : 0;
+  const cmA3     = maxPay3 - pool3;
+
+  const coPay3 = num(inp.s3CoPay) / 100;
+  const liPay3 = num(inp.s3LiPay) / 100;
+  const coPmt3 = coCont3 * coPay3;
+  const liPmt3 = liCont3 * liPay3;
+  const niPmt3 = pool3 - coPmt3 - liPmt3;
+  const niPay3 = niCont3 > 0 ? niPmt3 / niCont3 * 100 : 0;
+  const niNeg3 = niPmt3 < 0;
+  const totPmt3 = niPmt3 + coPmt3 + liPmt3;
+  const cmB3   = maxPay3 - totPmt3;
+
+  return (
+    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:14 }}>
+
+      {/* 왼쪽 */}
+      <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+        <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
+          <Sec label="① 원료 조건 — 1시트 자동 연동" color={C.blue} />
+          <CRow label="Co 환산가" value={f0(coP3)} unit="₩/kg" color={C.amber}
+            sub={"Co "+inp.coUSD+"$/lb × 2.20462 × "+inp.exchangeRate} />
+          <CRow label="Ni 환산가" value={f0(niP3)} unit="₩/kg" color={C.blue}
+            sub={"Ni "+inp.niUSD+"$/ton ÷ 1,000 × "+inp.exchangeRate} />
+          <CRow label="Li₂CO₃ 환산가" value={f0(liP3)} unit="₩/kg" color={C.green}
+            sub={"Li₂CO₃ "+inp.liUSD+"$/kg × "+inp.exchangeRate} />
+          <CRow label="분말화비율" value={inp.powderRatio+"%"} unit=""
+            sub="스크랩→BM 전환율" />
+          <CRow label="Co / Ni / Li 함량"
+            value={inp.coContent+"% / "+inp.niContent+"% / "+inp.liContent+"%"} unit="" />
+          <CRow label="Co / Ni / Li 회수율"
+            value={inp.coRecovery+"% / "+inp.niRecovery+"% / "+inp.liRecovery+"%"} unit="" />
+        </div>
+        <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
+          <Sec label="② 가공비 — 습식(1시트 연동) + 전처리·물류 추가" color={C.purple} />
+          <CRow label="Co 습식가공비" value={f0(num(inp.coWetCost))} unit="₩/kg-Co" color={C.purple} />
+          <CRow label="Ni 습식가공비" value={f0(num(inp.niWetCost))} unit="₩/kg-Ni" color={C.purple} />
+          <CRow label="Li 습식가공비" value={f0(num(inp.liWetCost))} unit="₩/kg-Li" color={C.purple} />
+          <IRow label="전처리 가공비" value={inp.s3PreTreat} onChange={s("s3PreTreat")}
+            unit="₩/kg-스크랩" note="스크랩→BM 공정 변동비" highlight />
+          <IRow label="물류비 (입고)" value={inp.s3Logistics} onChange={s("s3Logistics")}
+            unit="₩/kg-스크랩" note="원료 발생처→공장 운임" highlight />
+          <CRow label="변동비 합계" value={f0(totVar3)} unit="₩/kg-스크랩" color={C.red} bold
+            sub={"습식 "+f0(wetTotal3)+" + 전처리 "+f0(preTreat3)+" + 물류 "+f0(logistics3)} />
+        </div>
+      </div>
+
+      {/* 가운데 */}
+      <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+        <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
+          <Sec label="③ 원재료 내 함량가치 (Payable Rate 분모, 회수율 미적용)" color={C.green} />
+          <CRow label="Co 함량가치" value={f0(coCont3)} unit="₩/kg" color={C.amber}
+            sub={"Co "+inp.coContent+"% × 분말화 × "+f0(coP3)+"₩/kg"} />
+          <CRow label="Ni 함량가치" value={f0(niCont3)} unit="₩/kg" color={C.blue}
+            sub={"Ni "+inp.niContent+"% × 분말화 × "+f0(niP3)+"₩/kg"} />
+          <CRow label="Li₂CO₃ 함량가치" value={f0(liCont3)} unit="₩/kg" color={C.green}
+            sub={"Li "+inp.liContent+"% ÷18.8% × 분말화 × "+f0(liP3)+"₩/kg"} />
+          <CRow label="Co+Ni 함량가치" value={f0(coNiCont3)} unit="₩/kg" bold color={C.blue} />
+          <CRow label="전체 함량가치"  value={f0(totCont3)}  unit="₩/kg" bold color={C.green} />
+          <div style={{ background:"#0F172A", padding:"10px 14px" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+              marginBottom:8 }}>
+              <div>
+                <div style={{ fontSize:12, color:"#94A3B8", fontWeight:600 }}>최대 허용 매입단가</div>
+                <div style={{ fontSize:10, color:"#475569" }}>Output {f0(totOut3)} − 변동비 {f0(totVar3)}</div>
+              </div>
+              <span style={{ fontSize:20, fontWeight:800, color:"#FCD34D" }}>{f0(maxPay3)} ₩/kg</span>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6,
+              paddingTop:8, borderTop:"1px solid #1E293B" }}>
+              <div style={{ textAlign:"center" }}>
+                <div style={{ fontSize:10, color:"#64748B", marginBottom:2 }}>
+                  우리 최대 CoNi Rate
+                </div>
+                <div style={{ fontSize:16, fontWeight:800, color:"#FCD34D" }}>
+                  {coNiCont3>0 ? (maxPay3/coNiCont3*100).toFixed(2)+"%" : "—"}
+                </div>
+                <div style={{ fontSize:9, color:"#475569" }}>최대매입단가 ÷ Co+Ni 함량가치</div>
+              </div>
+              <div style={{ textAlign:"center" }}>
+                <div style={{ fontSize:10, color:"#64748B", marginBottom:2 }}>
+                  우리 최대 CoNiLi Rate
+                </div>
+                <div style={{ fontSize:16, fontWeight:800, color:"#93C5FD" }}>
+                  {totCont3>0 ? (maxPay3/totCont3*100).toFixed(2)+"%" : "—"}
+                </div>
+                <div style={{ fontSize:9, color:"#475569" }}>최대매입단가 ÷ 전체 함량가치</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
+          <Sec label="④ Mode A — CoNi Rate 입력 → 지급 풀 + CoNiLi 환산" color={C.amber} />
+          <div style={{ padding:"12px 14px", background:"#FFFBEB", borderBottom:"1px solid "+C.border }}>
+            <div style={{ fontSize:11, color:C.amber, fontWeight:700, marginBottom:8 }}>
+              상대방 제시 CoNi 지불률 (또는 목표치)
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+              <input type="number" value={inp.s3TargetCoNi}
+                onChange={e => s("s3TargetCoNi")(e.target.value)} onClick={e=>e.stopPropagation()}
+                style={{ width:80, fontSize:26, fontWeight:800, textAlign:"center",
+                  border:"2px solid "+C.amber, borderRadius:8, padding:"6px",
+                  background:"#FFFFFF", color:C.text }} />
+              <span style={{ fontSize:22, fontWeight:800, color:C.amber }}>%</span>
+              <div style={{ fontSize:11, color:C.muted, lineHeight:1.5 }}>
+                Co+Ni 기준<br/>
+                <span style={{ color:C.amber, fontWeight:600 }}>↓ Mode B 지급 풀 연동</span>
+              </div>
+            </div>
+            <div style={{ fontSize:11, color:C.muted }}>
+              총 지급 풀 = {f0(coNiCont3)} × {inp.s3TargetCoNi}%
+              = <b style={{ color:C.amber, fontSize:13 }}>{f0(pool3)} ₩/kg</b>
+            </div>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr" }}>
+            <div style={{ padding:"12px", borderRight:"1px solid "+C.border }}>
+              <div style={{ fontSize:10, color:C.muted, marginBottom:4 }}>입력 CoNi Rate</div>
+              <div style={{ fontSize:28, fontWeight:800, color:C.amber }}>{fp(tgtCoNi3)}</div>
+            </div>
+            <div style={{ padding:"12px" }}>
+              <div style={{ fontSize:10, color:C.muted, marginBottom:4 }}>환산 CoNiLi Rate</div>
+              <div style={{ fontSize:28, fontWeight:800, color:C.blue }}>{fp(cnliA3)}</div>
+              <div style={{ fontSize:10, color:C.dim }}>총지급풀 ÷ 전체함량가치</div>
+            </div>
+          </div>
+          <div style={{ margin:"0 12px 12px", padding:"10px 12px", borderRadius:8,
+            background:cmA3>=0?"#DCFCE7":"#FEF2F2",
+            border:"1px solid "+(cmA3>=0?"#86EFAC":"#FECACA") }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div>
+                <div style={{ fontSize:11, color:C.muted }}>이 Rate 적용 시 kg당 CM</div>
+                <div style={{ fontSize:10, color:C.dim }}>최대허용매입단가 − 총지급풀</div>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                <div style={{ fontSize:22, fontWeight:800,
+                  color:cmA3>=0?C.green:C.red }}>{f0(cmA3)} ₩/kg</div>
+                <div style={{ fontSize:10, color:cmA3>=0?C.green:C.red }}>
+                  {cmA3>=0?"✅ 변동비 커버":"🔴 변동비 미회수"}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 오른쪽 */}
+      <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+        <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
+          <Sec label="⑤ Mode B — Co·Li 고정 → Ni 자동 역산" color={C.purple} />
+          <div style={{ padding:"8px 14px", background:"#EFF6FF", borderBottom:"1px solid "+C.border }}>
+            <div style={{ fontSize:11, color:C.blue, fontWeight:700 }}>
+              📌 지급 풀 = Mode A 총지급액
+              <span style={{ fontWeight:800, fontSize:13, marginLeft:6 }}>{f0(pool3)} ₩/kg</span>
+            </div>
+            <div style={{ fontSize:10, color:C.dim, marginTop:2 }}>Co·Li 지불률 입력 → Ni 지불률 자동 역산</div>
+          </div>
+
+          <IRow label="Co 지불률 (고정 입력)" value={inp.s3CoPay}
+            onChange={s("s3CoPay")} unit="%" highlight />
+          <div style={{ padding:"4px 14px 6px", background:"#FFFBEB",
+            borderBottom:"1px solid "+C.border, fontSize:10, color:C.muted }}>
+            Co 지급 {f0(coPmt3)}₩  /  Co 함량가치 {f0(coCont3)}₩
+          </div>
+
+          <IRow label="Li 지불률 (고정 입력)" value={inp.s3LiPay}
+            onChange={s("s3LiPay")} unit="%" highlight />
+          <div style={{ padding:"4px 14px 6px", background:"#F0FDFA",
+            borderBottom:"1px solid "+C.border, fontSize:10, color:C.muted }}>
+            Li 지급 {f0(liPmt3)}₩  /  Li 함량가치 {f0(liCont3)}₩
+          </div>
+
+          <div style={{ padding:"10px 14px", borderBottom:"1px solid "+C.border,
+            background:niNeg3?"#FEF2F2":"#EFF6FF" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div>
+                <div style={{ fontSize:12, fontWeight:700, color:C.blue }}>Ni 지불률</div>
+                <div style={{ fontSize:10, color:C.dim }}>
+                  ({f0(pool3)} − {f0(coPmt3)} − {f0(liPmt3)}) ÷ {f0(niCont3)}
+                </div>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                <span style={{ fontSize:10, background:"#DBEAFE", color:C.blue,
+                  borderRadius:4, padding:"2px 6px", fontWeight:600 }}>🔄 자동</span>
+                <span style={{ fontSize:24, fontWeight:800,
+                  color:niNeg3?C.red:C.blue }}>
+                  {niNeg3?"⚠ 불가":fp(niPay3)}
+                </span>
+              </div>
+            </div>
+            {niNeg3 && (
+              <div style={{ fontSize:11, color:C.red, marginTop:4 }}>
+                Co·Li 지급액이 풀을 초과합니다. Co 또는 Li를 낮춰주세요.
+              </div>
+            )}
+          </div>
+
+          <div style={{ padding:"12px 14px", borderBottom:"1px solid "+C.border }}>
+            <div style={{ fontSize:11, color:C.muted, fontWeight:600, marginBottom:8 }}>
+              메탈별 지불률 요약 (계약서 기재용)
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6 }}>
+              {[
+                { label:"Ni 지불률", val:niPay3,             color:C.blue,  auto:true },
+                { label:"Co 지불률", val:num(inp.s3CoPay),   color:C.amber, auto:false },
+                { label:"Li 지불률", val:num(inp.s3LiPay),   color:C.green, auto:false },
+              ].map((item,i) => (
+                <div key={i} style={{ padding:"8px", background:C.secBg,
+                  border:"1px solid "+C.border, borderRadius:8, textAlign:"center" }}>
+                  <div style={{ fontSize:10, color:C.muted, marginBottom:3 }}>{item.label}</div>
+                  <div style={{ fontSize:19, fontWeight:800,
+                    color:(i===0&&niNeg3)?C.red:item.color }}>
+                    {(i===0&&niNeg3)?"—":fp(item.val)}
+                  </div>
+                  {item.auto && (
+                    <div style={{ fontSize:9, color:C.blue, marginTop:2 }}>자동 역산</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ padding:"10px 14px", background:"#EFF6FF",
+            borderBottom:"1px solid "+C.border }}>
+            <div style={{ fontSize:10, color:C.blue, fontWeight:700, marginBottom:6 }}>
+              = Mode A 기준으로 표현하면 (동일 총지급액)
+            </div>
+            <div style={{ display:"flex", gap:14 }}>
+              <div>
+                <div style={{ fontSize:10, color:C.muted }}>CoNi Rate</div>
+                <div style={{ fontSize:18, fontWeight:800, color:C.amber }}>{fp(tgtCoNi3)}</div>
+              </div>
+              <div>
+                <div style={{ fontSize:10, color:C.muted }}>CoNiLi Rate</div>
+                <div style={{ fontSize:18, fontWeight:800, color:C.blue }}>{fp(cnliA3)}</div>
+              </div>
+            </div>
+            <div style={{ fontSize:9, color:C.dim, marginTop:4 }}>
+              총 지급액 {f0(totPmt3)}₩ = 풀 {f0(pool3)}₩ ✅
+            </div>
+          </div>
+
+          <div style={{ margin:"12px", padding:"10px 12px", borderRadius:8,
+            background:cmB3>=0?"#DCFCE7":"#FEF2F2",
+            border:"1px solid "+(cmB3>=0?"#86EFAC":"#FECACA") }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div>
+                <div style={{ fontSize:11, color:C.muted }}>kg당 CM</div>
+                <div style={{ fontSize:10, color:C.dim }}>최대허용매입단가 − 총지급액</div>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                <div style={{ fontSize:22, fontWeight:800,
+                  color:cmB3>=0?C.green:C.red }}>{f0(cmB3)} ₩/kg</div>
+                <div style={{ fontSize:10, color:cmB3>=0?C.green:C.red }}>
+                  {cmB3>=0?"✅ 변동비 커버":"🔴 변동비 미회수"}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
 function App() {
   const [tab, setTab]   = useState(0);
   const [tgt, setTgt]   = useState("90");
@@ -324,6 +652,8 @@ function App() {
     niSO4Price:"0", coSO4Price:"0", liCO3Price:"0",
     niChPay:"0", coChPay:"0", liChPay:"0",
     chNiContent:"", chCoContent:"", chLiContent:"",
+    s3PreTreat:"0", s3Logistics:"0",
+    s3TargetCoNi:"88", s3CoPay:"15", s3LiPay:"20",
   });
 
   const s = k => v => setInp(p => ({ ...p, [k]: v }));
@@ -357,7 +687,7 @@ function App() {
         </div>
 
         <div style={{ display:"flex", background:"#FFFFFF", borderBottom:"2px solid "+C.border }}>
-          {["1시트  Payable Rate 계산","2시트  목표 가공비 역산"].map((t,i) => (
+          {["1시트  Payable Rate 계산","2시트  목표 가공비 역산","3시트  스크랩 Payable"].map((t,i) => (
             <button key={i} onClick={() => setTab(i)}
               style={{ padding:"11px 20px", fontSize:13, fontWeight:600, cursor:"pointer",
                 border:"none", background:"transparent",
@@ -769,7 +1099,7 @@ function App() {
 
           {tab === 1 && (
             <>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
               <div style={{ background:C.card, borderRadius:10, overflow:"hidden", border:"1px solid "+C.border }}>
                 <Sec label="① 1시트 연동 (자동)" color={C.blue} />
                 <CRow label="Output 합계 (회수 후)" value={f0(c.totOut)} unit="₩/kg" bold />
@@ -1078,6 +1408,12 @@ function App() {
           </div>
 
             </>
+          )}
+
+          {tab === 2 && (
+            <Sheet3Boundary>
+              <Sheet3Tab inp={inp} s={s} />
+            </Sheet3Boundary>
           )}
 
         </div>
