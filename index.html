@@ -56,8 +56,9 @@ function compute(inp) {
   const krV     = num(inp.krLocalLogistics);
   const calcV   = num(inp.calcinationCost);
   const otherV  = num(inp.otherVarCost);
+  const byproduct = num(inp.byproductRevenue);
   const totVar  = preV + wetTotal + localV + intlV*pr + krV*pr + calcV*pr + otherV;
-  const payable = totOut - totVar;
+  const payable = totOut - totVar + byproduct;
   // Payable Rate = payable ÷ 함량가치 (시장 관행: contained value 기준)
   // 소수점 2자리 반올림 후 CoNiLi는 CoNi 경유 계산 → 두 시트 일치
   const ratioCoNi   = coNiContained > 0 ? Math.round((payable / coNiContained) * 10000) / 100 : NaN;
@@ -81,7 +82,7 @@ function compute(inp) {
     coP, niP, liP, pr, coOut, niOut, liOut,
     coVal, niVal, liVal, totOut, coNiOut,
     coContained, niContained, liContained, coNiContained, totContained,
-    wetTotal, preV, localV, intlV, krV, calcV, otherV, totVar,
+    wetTotal, preV, localV, intlV, krV, calcV, otherV, byproduct, totVar,
     payable, ratioCoNi, ratioCoNiLi,
     mktRatio, marketPrice, cmKg, cmMon, fixedCost, fixedPerKg, covPct,
     actualPrice, varMargin, varMarginPct, fullMargin, fullMarginPct,
@@ -242,7 +243,7 @@ function CopyBtn({ c, inp }) {
   const [copied, setCopied] = useState(false);
   const handle = () => {
     const now = new Date().toLocaleDateString("ko-KR");
-    const sig = c.cmKg < 0 ? "🔴 상한선 초과 — 변동비 미회수"
+    const sig = c.cmKg < 0 ? "🔴 상한선 초과 — 비용 미회수"
       : c.cmKg < c.fixedPerKg ? "🟡 유휴 캐파 범위에서 고정비 부분 흡수 — 매입 권장"
       : "✅ 유휴 캐파 범위에서 이 딜이 고정비 부담 완화에 기여";
     const hasActual = c.actualPrice > 0;
@@ -274,8 +275,8 @@ function CopyBtn({ c, inp }) {
         `완전원가 기준 마진:      ${c.fullMargin>=0?"+":""}${Math.round(c.fullMargin).toLocaleString("ko-KR")} ₩/kg  (${isNaN(c.fullMarginPct)?"—":(c.fullMarginPct>=0?"+":"")+c.fullMarginPct.toFixed(1)+"%"})`,
         `  └ kg당 고정비 배부:   ${Math.round(c.fixedPerKg).toLocaleString("ko-KR")} ₩/kg  (월고정비 ${inp.monthlyFixedCost}억 ÷ 가동량 ${inp.monthlyVolume}ton)`,
         c.fullMargin < 0 && c.varMargin >= 0
-          ? "  ※ 변동비는 회수 중 · 고정비 부분 흡수 — 유휴 캐파 범위에서 매입 권장"
-          : c.fullMargin >= 0 ? "  ※ 완전원가 기준으로도 흑자" : "  ※ 변동비 미회수 — 매입 불가",
+          ? "  ※ 비용은 회수 중 · 고정비 부분 흡수 — 유휴 캐파 범위에서 매입 권장"
+          : c.fullMargin >= 0 ? "  ※ 완전원가 기준으로도 흑자" : "  ※ 비용 미회수 — 매입 불가",
         "",
       ] : []),
       "【 판단 】",
@@ -359,9 +360,14 @@ function Sheet3Tab({ inp, s }) {
   const totOut3 = coOut3*coP3 + niOut3*niP3 + liOut3*liP3;
 
   const wetTotal3  = coOut3*num(inp.coWetCost) + niOut3*num(inp.niWetCost) + liOut3*num(inp.liWetCost);
-  const preTreat3  = num(inp.s3PreTreat);
-  const logistics3 = num(inp.s3Logistics);
-  const totVar3    = wetTotal3 + preTreat3 + logistics3;
+  const preTreat3  = num(inp.preProcessCost);
+  const logistics3 = num(inp.localLogistics);
+  const intl3      = num(inp.intlLogistics) * pr3;
+  const krLocal3   = num(inp.krLocalLogistics) * pr3;
+  const calcin3    = num(inp.calcinationCost) * pr3;
+  const other3     = num(inp.otherVarCost);
+  const byproduct3 = num(inp.byproductRevenue);
+  const totVar3    = wetTotal3 + preTreat3 + logistics3 + intl3 + krLocal3 + calcin3 + other3 - byproduct3;
   const maxPay3    = totOut3 - totVar3;
 
   const tgtCoNi3 = num(inp.s3TargetCoNi);
@@ -400,16 +406,26 @@ function Sheet3Tab({ inp, s }) {
             value={inp.coRecovery+"% / "+inp.niRecovery+"% / "+inp.liRecovery+"%"} unit="" />
         </div>
         <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
-          <Sec label="② 가공비 — 습식(1시트 연동) + 전처리·물류 추가" color={C.purple} />
+          <Sec label="② 가공비 — 1시트 자동 연동" color={C.purple} />
           <CRow label="Co 습식가공비" value={f0(num(inp.coWetCost))} unit="₩/kg-Co" color={C.purple} />
           <CRow label="Ni 습식가공비" value={f0(num(inp.niWetCost))} unit="₩/kg-Ni" color={C.purple} />
           <CRow label="Li 습식가공비" value={f0(num(inp.liWetCost))} unit="₩/kg-Li" color={C.purple} />
-          <IRow label="전처리 가공비" value={inp.s3PreTreat} onChange={s("s3PreTreat")}
-            unit="₩/kg-스크랩" note="스크랩→BM 공정 변동비" highlight />
-          <IRow label="물류비 (입고)" value={inp.s3Logistics} onChange={s("s3Logistics")}
-            unit="₩/kg-스크랩" note="원료 발생처→공장 운임" highlight />
-          <CRow label="변동비 합계" value={f0(totVar3)} unit="₩/kg-스크랩" color={C.red} bold
-            sub={"습식 "+f0(wetTotal3)+" + 전처리 "+f0(preTreat3)+" + 물류 "+f0(logistics3)} />
+          <CRow label="전처리 가공비" value={f0(num(inp.preProcessCost))} unit="₩/kg-스크랩"
+            color={C.purple} sub="1시트 전처리 가공비 연동" />
+          <CRow label="로컬 물류비" value={f0(num(inp.localLogistics))} unit="₩/kg-스크랩"
+            color={C.purple} sub="1시트 로컬 물류비 연동" />
+          <CRow label="국제 운임 (CIF 부산)" value={f0(num(inp.intlLogistics)*num(inp.powderRatio)/100)} unit="₩/kg-스크랩"
+            color={C.purple} sub={"₩/kg-BM "+f0(num(inp.intlLogistics))+" × 분말화 "+inp.powderRatio+"%"} />
+          <CRow label="한국 로컬 (부산→군산)" value={f0(num(inp.krLocalLogistics)*num(inp.powderRatio)/100)} unit="₩/kg-스크랩"
+            color={C.purple} sub={"₩/kg-BM "+f0(num(inp.krLocalLogistics))+" × 분말화 "+inp.powderRatio+"%"} />
+          <CRow label="소성비용" value={f0(num(inp.calcinationCost)*num(inp.powderRatio)/100)} unit="₩/kg-스크랩"
+            color={C.purple} sub={"₩/kg-BM "+f0(num(inp.calcinationCost))+" × 분말화 "+inp.powderRatio+"%"} />
+          <CRow label="기타 비용" value={f0(num(inp.otherVarCost))} unit="₩/kg-스크랩"
+            color={C.purple} />
+          <CRow label="부산물 판매수익 (차감)" value={f0(num(inp.byproductRevenue))} unit="₩/kg-스크랩"
+            color={C.green} sub="1시트 연동 · Payable 상한선 증가" />
+          <CRow label="비용 합계 (부산물 차감 후)" value={f0(totVar3)} unit="₩/kg-스크랩" color={C.red} bold
+            sub={"습식 "+f0(wetTotal3)+" + 전처리 "+f0(preTreat3)+" + 물류 등 − 부산물"} />
         </div>
       </div>
 
@@ -430,7 +446,7 @@ function Sheet3Tab({ inp, s }) {
               marginBottom:8 }}>
               <div>
                 <div style={{ fontSize:12, color:"#94A3B8", fontWeight:600 }}>최대 허용 매입단가</div>
-                <div style={{ fontSize:10, color:"#475569" }}>Output {f0(totOut3)} − 변동비 {f0(totVar3)}</div>
+                <div style={{ fontSize:10, color:"#475569" }}>Output {f0(totOut3)} − 비용 {f0(totVar3)}</div>
               </div>
               <span style={{ fontSize:20, fontWeight:800, color:"#FCD34D" }}>{f0(maxPay3)} ₩/kg</span>
             </div>
@@ -504,7 +520,7 @@ function Sheet3Tab({ inp, s }) {
                 <div style={{ fontSize:22, fontWeight:800,
                   color:cmA3>=0?C.green:C.red }}>{f0(cmA3)} ₩/kg</div>
                 <div style={{ fontSize:10, color:cmA3>=0?C.green:C.red }}>
-                  {cmA3>=0?"✅ 변동비 커버":"🔴 변동비 미회수"}
+                  {cmA3>=0?"✅ 비용 커버":"🔴 비용 미회수"}
                 </div>
               </div>
             </div>
@@ -620,7 +636,7 @@ function Sheet3Tab({ inp, s }) {
                 <div style={{ fontSize:22, fontWeight:800,
                   color:cmB3>=0?C.green:C.red }}>{f0(cmB3)} ₩/kg</div>
                 <div style={{ fontSize:10, color:cmB3>=0?C.green:C.red }}>
-                  {cmB3>=0?"✅ 변동비 커버":"🔴 변동비 미회수"}
+                  {cmB3>=0?"✅ 비용 커버":"🔴 비용 미회수"}
                 </div>
               </div>
             </div>
@@ -647,6 +663,7 @@ function App() {
     preProcessCost:"0", localLogistics:"22",
     intlLogistics:"0", krLocalLogistics:"0",
     calcinationCost:"0", otherVarCost:"0",
+    byproductRevenue:"0",
     actualPrice:"0",
     marketRatioCoNi:"88", monthlyVolume:"1350", monthlyFixedCost:"58",
     niSO4Price:"0", coSO4Price:"0", liCO3Price:"0",
@@ -682,7 +699,7 @@ function App() {
           <div style={{ fontSize:11, letterSpacing:"0.15em", color:"#94A3B8", textTransform:"uppercase" }}>원료 매입 단가 분석</div>
           <div style={{ fontSize:20, fontWeight:800, marginTop:2, color:C.headerText }}>CM 기반 Payable Rate 계산기</div>
           <div style={{ fontSize:12, color:"#94A3B8", marginTop:4 }}>
-            변동비만 차감 · Payable Rate = 변동비 기준 최대 허용 지급률(상한선) · 유휴 캐파 범위 판단 도구
+            비용만 차감 · Payable Rate = 비용 기준 최대 허용 지급률(상한선) · 유휴 캐파 범위 판단 도구
           </div>
         </div>
 
@@ -703,8 +720,8 @@ function App() {
           {tab === 0 && (
             <div>
 
-              {/* ── 행1: 입력 | 결과 ── */}
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+              {/* ── 행1: 입력 | 결과 | Payable·CM ── */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:14 }}>
 
                 {/* 왼쪽: 입력 */}
                 <div style={{ background:C.card, borderRadius:10, overflow:"hidden", border:"1px solid "+C.border }}>
@@ -739,34 +756,32 @@ function App() {
                   <IRow label="Li₂CO₃ 회수율" value={inp.liRecovery} onChange={s("liRecovery")} unit="%"
                     formula={"Li₂CO₃ 회수율: 습식공정에서 실제 회수되는 비율\n= 회수된 Li₂CO₃(kg) ÷ 투입 Li₂CO₃(kg) × 100\n현재 입력값: "+inp.liRecovery+"%"} />
 
-                  <Sec label="⑤ 습식가공비 (변동분만)" color={C.purple} />
+                  <Sec label="⑤ 습식가공비" color={C.purple} />
                   <div style={{ padding:"3px 10px", fontSize:11, color:"#7C3AED" }}>₩/kg-제품 기준 · 고정비(감가·고정인건비) 제외</div>
-                  <IRow label="Co 습식가공비" value={inp.coWetCost} onChange={s("coWetCost")} unit="₩/kg"
-                    tags={["변동","직접경비"]} accent />
-                  <IRow label="Ni 습식가공비" value={inp.niWetCost} onChange={s("niWetCost")} unit="₩/kg"
-                    tags={["변동","직접경비"]} accent />
-                  <IRow label="Li₂CO₃ 습식가공비" value={inp.liWetCost} onChange={s("liWetCost")} unit="₩/kg"
-                    tags={["변동","직접경비"]} accent />
+                  <IRow label="Co 습식가공비" value={inp.coWetCost} onChange={s("coWetCost")} unit="₩/kg" accent />
+                  <IRow label="Ni 습식가공비" value={inp.niWetCost} onChange={s("niWetCost")} unit="₩/kg" accent />
+                  <IRow label="Li₂CO₃ 습식가공비" value={inp.liWetCost} onChange={s("liWetCost")} unit="₩/kg" accent />
                   <CRow label="총 습식가공비 (원료 kg당)" value={f0(c.wetTotal)} unit="₩/kg" color={C.purple} bold
                     formula={"총 습식가공비 = Co_out×Co가공비 + Ni_out×Ni가공비 + Li_out×Li가공비\n"+"Co:  "+(c.coOut*1000).toFixed(2)+"g/kg × "+inp.coWetCost+"₩/kg = "+f0(c.coOut*num(inp.coWetCost))+"₩\n"+"Ni:  "+(c.niOut*1000).toFixed(2)+"g/kg × "+inp.niWetCost+"₩/kg = "+f0(c.niOut*num(inp.niWetCost))+"₩\n"+"Li:  "+(c.liOut*1000).toFixed(2)+"g/kg × "+inp.liWetCost+"₩/kg = "+f0(c.liOut*num(inp.liWetCost))+"₩\n"+"합계: "+f0(c.wetTotal)+"₩/kg"} />
 
-                  <Sec label="⑥ 물류 · 소성 · 기타 변동비" color={C.red} />
-                  <IRow label="전처리 변동비" value={inp.preProcessCost} onChange={s("preProcessCost")} unit="₩/kg"
-                    tags={["변동","직접경비"]} note="₩/kg-스크랩 기준 · BM 직매입=0" accent />
-                  <IRow label="로컬 물류비" value={inp.localLogistics} onChange={s("localLogistics")} unit="₩/kg"
-                    tags={["변동","간접경비"]} note="₩/kg-입력원료 기준"
+                  <Sec label="⑥ 물류 · 소성 · 기타 비용" color={C.red} />
+                  <IRow label="전처리 가공비" value={inp.preProcessCost} onChange={s("preProcessCost")} unit="₩/kg" note="₩/kg-스크랩 기준 · BM 직매입=0" accent />
+                  <IRow label="로컬 물류비" value={inp.localLogistics} onChange={s("localLogistics")} unit="₩/kg" note="₩/kg-입력원료 기준"
                     formula="입력원료 1kg당 운임, 그대로 적용" />
-                  <IRow label="국제 운임 (CIF 부산)" value={inp.intlLogistics} onChange={s("intlLogistics")} unit="₩/kg-BM"
-                    tags={["변동","간접경비"]} note="₩/kg-BM · 해외→부산 · 불필요시 0"
+                  <IRow label="국제 운임 (CIF 부산)" value={inp.intlLogistics} onChange={s("intlLogistics")} unit="₩/kg-BM" note="₩/kg-BM · 해외→부산 · 불필요시 0"
                     formula={"예) $5,000 ÷ 20,000kg = $0.25/kg-BM\n자동환산: ×분말화비율"} />
-                  <IRow label="한국 로컬 (부산→군산)" value={inp.krLocalLogistics} onChange={s("krLocalLogistics")} unit="₩/kg-BM"
-                    tags={["변동","간접경비"]} note="₩/kg-BM · 불필요시 0"
+                  <IRow label="한국 로컬 (부산→군산)" value={inp.krLocalLogistics} onChange={s("krLocalLogistics")} unit="₩/kg-BM" note="₩/kg-BM · 불필요시 0"
                     formula="자동환산: ×분말화비율" />
-                  <IRow label="소성비용 (군산)" value={inp.calcinationCost} onChange={s("calcinationCost")} unit="₩/kg-BM"
-                    tags={["변동","직접경비"]} note="₩/kg-BM · BM 전용 · 불필요시 0"
+                  <IRow label="소성비용 (군산)" value={inp.calcinationCost} onChange={s("calcinationCost")} unit="₩/kg-BM" note="₩/kg-BM · BM 전용 · 불필요시 0"
                     formula="자동환산: ×분말화비율" />
-                  <IRow label="기타 변동비" value={inp.otherVarCost} onChange={s("otherVarCost")} unit="₩/kg"
-                    tags={["변동"]} />
+                  <IRow label="기타 비용" value={inp.otherVarCost} onChange={s("otherVarCost")} unit="₩/kg" />
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+                <div style={{ background:C.card, borderRadius:10, overflow:"hidden", border:"1px solid "+C.border }}>
+                  <Sec label="⑦ 부산물 판매수익" color={C.green} />
+                  <IRow label="부산물 판매수익" value={inp.byproductRevenue} onChange={s("byproductRevenue")}
+                    unit="₩/kg-스크랩" accent
+                    note="스크랩 kg당 부산물(동·알루미늄 등) 판매수익 · 분말화비율 미적용 · Payable 상한선 증가" />
                 </div>
 
                 {/* 오른쪽: 결과 */}
@@ -795,7 +810,7 @@ function App() {
                     formula="Co함량가치 + Ni함량가치 + Li함량가치\n※ Li: 입력 Li함량(%) ÷ 18.8% → Li₂CO₃ 환산 후 시세 적용" />
 
                   {/* ── 회수 후: 실제 Output 가치 ── */}
-                  <Sec label="회수 후 실제 Output 가치 — 변동비 계산 기준" color={C.green} />
+                  <Sec label="회수 후 실제 Output 가치 — 비용 계산 기준" color={C.green} />
                   <CRow label="Co 가치" value={f0(c.coVal)} unit="₩/kg"
                     sub={"Co 회수량 "+(c.coOut*1000).toFixed(1)+" g/kg-원료 (회수율 "+inp.coRecovery+"%)"}
                     formula={"Co 환산가 = Co $/lb × 2.20462 × 환율\nCo가치 = Co함량 × 분말화 × Co회수율 × Co환산가\n= "+inp.coContent+"% × "+inp.powderRatio+"% × "+inp.coRecovery+"% × "+f0(c.coP)+" ₩/kg"} />
@@ -807,20 +822,26 @@ function App() {
                     formula={"Li₂CO₃ = Li함량 ÷ 18.8%\n→ Li₂CO₃가치 = Li₂CO₃ × 분말화 × Li회수율 × Li₂CO₃환산가\n= "+inp.liContent+"% ÷ 18.8% × "+inp.powderRatio+"% × "+inp.liRecovery+"% × "+f0(c.liP)} />
                   <CRow label="Output 합계 (회수 후)" value={f0(c.totOut)} unit="₩/kg" bold formula="Co+Ni+Li₂CO₃ 회수가치 합계" />
 
-                  <Sec label="변동비 합계" color={C.red} />
-                  <CRow label="전처리 변동비" value={"-"+f0(c.preV)} unit="₩/kg" color="#DC2626" tags={["변동","직접경비"]} />
-                  <CRow label="습식가공비" value={"-"+f0(c.wetTotal)} unit="₩/kg" color="#DC2626" tags={["변동","직접경비"]} />
-                  <CRow label="로컬 물류비" value={"-"+f0(c.localV)} unit="₩/kg" color="#DC2626" tags={["변동","간접경비"]} />
-                  <CRow label="국제 운임" value={"-"+f0(c.intlV*c.pr)} unit="₩/kg" color="#DC2626" tags={["변동","간접경비"]}
+                  <Sec label="비용 합계" color={C.red} />
+                  <CRow label="전처리 가공비" value={"-"+f0(c.preV)} unit="₩/kg" color="#DC2626" />
+                  <CRow label="습식가공비" value={"-"+f0(c.wetTotal)} unit="₩/kg" color="#DC2626" />
+                  <CRow label="로컬 물류비" value={"-"+f0(c.localV)} unit="₩/kg" color="#DC2626" />
+                  <CRow label="국제 운임" value={"-"+f0(c.intlV*c.pr)} unit="₩/kg" color="#DC2626"
                     formula={"국제운임 × 분말화비율\n= "+f0(c.intlV)+" × "+(c.pr*100).toFixed(0)+"% = "+f0(c.intlV*c.pr)} />
-                  <CRow label="한국 로컬" value={"-"+f0(c.krV*c.pr)} unit="₩/kg" color="#DC2626" tags={["변동","간접경비"]}
+                  <CRow label="한국 로컬" value={"-"+f0(c.krV*c.pr)} unit="₩/kg" color="#DC2626"
                     formula={"한국로컬 × 분말화비율\n= "+f0(c.krV)+" × "+(c.pr*100).toFixed(0)+"% = "+f0(c.krV*c.pr)} />
-                  <CRow label="소성비용" value={"-"+f0(c.calcV*c.pr)} unit="₩/kg" color="#DC2626" tags={["변동","직접경비"]}
+                  <CRow label="소성비용" value={"-"+f0(c.calcV*c.pr)} unit="₩/kg" color="#DC2626"
                     formula={"소성비 × 분말화비율\n= "+f0(c.calcV)+" × "+(c.pr*100).toFixed(0)+"% = "+f0(c.calcV*c.pr)} />
-                  <CRow label="기타 변동비" value={"-"+f0(c.otherV)} unit="₩/kg" color="#DC2626" tags={["변동"]} />
-                  <CRow label="변동비 합계" value={"-"+f0(c.totVar)} unit="₩/kg" bold color={C.red}
+                  <CRow label="기타 비용" value={"-"+f0(c.otherV)} unit="₩/kg" color="#DC2626" />
+                  <CRow label="부산물 판매수익" value={"+"+f0(c.byproduct)} unit="₩/kg" color={C.green}
+                    sub="Payable 상한선 증가" />
+                  <CRow label="비용 합계 (부산물 차감 후)" value={"-"+f0(c.totVar)} unit="₩/kg" bold color={C.red}
                     formula="전처리+습식+로컬+국제+한국로컬+소성+기타" />
+                </div>
+                </div>
 
+                {/* Payable Rate + CM분석 */}
+                <div style={{ background:C.card, borderRadius:10, overflow:"hidden", border:"1px solid "+C.border }}>
                   <Sec label="Payable Rate — 원재료 내 함량가치 대비 최대 허용 지급률 (상한선)" color={C.amber} />
                   <div style={{ margin:"6px 10px", padding:"12px 14px",
                     background:"#FFFBEB", border:"1px solid #D97706", borderRadius:8 }}>
@@ -845,7 +866,7 @@ function App() {
                       display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                       <div>
                         <div style={{ fontSize:11, fontWeight:600, color:"#475569" }}>매입단가 (₩/kg 환산)</div>
-                        <div style={{ fontSize:10, color:"#64748B" }}>= 회수Output - 변동비합계</div>
+                        <div style={{ fontSize:10, color:"#64748B" }}>= 회수Output - 비용합계</div>
                       </div>
                       <span style={{ fontSize:17, fontWeight:700, color:C.amber }}>{f0(c.payable)} ₩/kg</span>
                     </div>
@@ -1025,7 +1046,7 @@ function App() {
                       <div style={{ fontSize:14, fontWeight:800, color:"#FFFFFF", marginBottom:4 }}>
                         {sig==="green" && "✅ 유휴 캐파 범위에서 이 딜이 고정비 부담 완화에 기여"}
                         {sig==="amber" && "🟡 유휴 캐파 범위에서 고정비 부분 흡수 — 매입 권장"}
-                        {sig==="red"   && "🔴 상한선 초과 — 변동비 미회수"}
+                        {sig==="red"   && "🔴 상한선 초과 — 비용 미회수"}
                       </div>
                       <div style={{ fontSize:11, color:"rgba(255,255,255,0.75)" }}>
                         {sig==="green" && "kg당 CM > kg당 고정비 → 이 딜이 고정비 커버에 기여"}
@@ -1109,18 +1130,15 @@ function App() {
                   sub="CoNiLi 기준 Payable Rate 분모 (중국)" />
 
                 <Sec label="② 비용 입력 (1시트 연동 · 수정 가능)" color={C.red} />
-                <IRow label="전처리 변동비" value={inp.preProcessCost} onChange={s("preProcessCost")} unit="₩/kg"
-                  tags={["변동","직접경비"]} note="₩/kg-스크랩" />
-                <IRow label="로컬 물류비" value={inp.localLogistics} onChange={s("localLogistics")} unit="₩/kg"
-                  tags={["변동","간접경비"]} note="₩/kg-입력원료" />
-                <IRow label="국제 운임" value={inp.intlLogistics} onChange={s("intlLogistics")} unit="₩/kg-BM"
-                  tags={["변동","간접경비"]} note="₩/kg-BM · 자동환산 ×분말화비율" />
-                <IRow label="한국 로컬 (부산→군산)" value={inp.krLocalLogistics} onChange={s("krLocalLogistics")} unit="₩/kg-BM"
-                  tags={["변동","간접경비"]} note="₩/kg-BM · 자동환산 ×분말화비율" />
-                <IRow label="소성비용" value={inp.calcinationCost} onChange={s("calcinationCost")} unit="₩/kg-BM"
-                  tags={["변동","직접경비"]} note="₩/kg-BM · 자동환산 ×분말화비율" />
-                <IRow label="기타 변동비" value={inp.otherVarCost} onChange={s("otherVarCost")} unit="₩/kg"
-                  tags={["변동"]} />
+                <IRow label="전처리 가공비" value={inp.preProcessCost} onChange={s("preProcessCost")} unit="₩/kg" note="₩/kg-스크랩" />
+                <IRow label="로컬 물류비" value={inp.localLogistics} onChange={s("localLogistics")} unit="₩/kg" note="₩/kg-입력원료" />
+                <IRow label="국제 운임" value={inp.intlLogistics} onChange={s("intlLogistics")} unit="₩/kg-BM" note="₩/kg-BM · 자동환산 ×분말화비율" />
+                <IRow label="한국 로컬 (부산→군산)" value={inp.krLocalLogistics} onChange={s("krLocalLogistics")} unit="₩/kg-BM" note="₩/kg-BM · 자동환산 ×분말화비율" />
+                <IRow label="소성비용" value={inp.calcinationCost} onChange={s("calcinationCost")} unit="₩/kg-BM" note="₩/kg-BM · 자동환산 ×분말화비율" />
+                <IRow label="기타 비용" value={inp.otherVarCost} onChange={s("otherVarCost")} unit="₩/kg" />
+                <IRow label="부산물 판매수익" value={inp.byproductRevenue} onChange={s("byproductRevenue")}
+                  unit="₩/kg-스크랩" accent
+                  note="스크랩 kg당 부산물 판매수익 · 분말화비율 미적용" />
                 <CRow label="비용 소계 (습식 제외)" unit="₩/kg"
                   value={f0(c.preV+c.localV+c.intlV*c.pr+c.krV*c.pr+c.calcV*c.pr+c.otherV)} />
 
@@ -1155,12 +1173,13 @@ function App() {
                 <div style={{ padding:"10px 14px", background:"#FFFFFF" }}>
                   {[
                     { label:"Output 합계",       val:f0(c.totOut),        color:C.green,  minus:false },
-                    { label:"(-) 전처리 변동비",  val:f0(c.preV),          color:C.red,    minus:true  },
+                    { label:"(-) 전처리 가공비",  val:f0(c.preV),          color:C.red,    minus:true  },
                     { label:"(-) 로컬 물류비",    val:f0(c.localV),        color:C.red,    minus:true  },
                     { label:"(-) 국제 운임",      val:f0(c.intlV*c.pr),    color:C.red,    minus:true  },
                     { label:"(-) 한국 로컬",      val:f0(c.krV*c.pr),      color:C.red,    minus:true  },
                     { label:"(-) 소성비용",       val:f0(c.calcV*c.pr),    color:C.red,    minus:true  },
-                    { label:"(-) 기타 변동비",    val:f0(c.otherV),        color:C.red,    minus:true  },
+                    { label:"(-) 기타 비용",    val:f0(c.otherV),        color:C.red,    minus:true  },
+                    { label:"(+) 부산물 판매수익", val:f0(c.byproduct),     color:C.green,  minus:false },
                     { label:"(-) 목표 매입단가",  val:f0(tgtPayable),      color:C.amber,  minus:true  },
                   ].map((r,i) => (
                     <div key={i} style={{ display:"flex", justifyContent:"space-between",
@@ -1173,7 +1192,7 @@ function App() {
                     padding:"8px 0", borderTop:"2px solid #334155", marginTop:2 }}>
                     <div>
                       <div style={{ fontSize:14, fontWeight:700, color:"#C4B5FD" }}>= 목표 가공비</div>
-                      <div style={{ fontSize:11, color:C.dim }}>Output - 기타변동비 - 목표매입단가</div>
+                      <div style={{ fontSize:11, color:C.dim }}>Output - 기타비용 - 목표매입단가</div>
                     </div>
                     <span style={{ fontSize:20, fontWeight:800, color:allowedWet>=0?C.purple:C.red }}>
                       {f0(allowedWet)} ₩/kg
