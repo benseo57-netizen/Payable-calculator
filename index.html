@@ -61,9 +61,9 @@ function compute(inp) {
   const payable = totOut - totVar + byproduct;
   // Payable Rate = payable ÷ 함량가치 (시장 관행: contained value 기준)
   // 소수점 2자리 반올림 후 CoNiLi는 CoNi 경유 계산 → 두 시트 일치
-  const ratioCoNi   = coNiContained > 0 ? Math.round((payable / coNiContained) * 10000) / 100 : NaN;
+  const ratioCoNi   = coNiContained > 0 ? Math.round((payable / coNiContained) * 1000) / 10 : NaN;
   const ratioCoNiLi = (coNiContained > 0 && totContained > 0)
-    ? Math.round(ratioCoNi * (coNiContained / totContained) * 100) / 100 : NaN;
+    ? Math.round(ratioCoNi * (coNiContained / totContained) * 10) / 10 : NaN;
   const mktRatio    = num(inp.marketRatioCoNi);
   // 시장 매입단가 = 함량가치 × 시장 Rate (contained value 기준)
   const marketPrice = coNiContained * (mktRatio / 100);
@@ -257,8 +257,8 @@ function CopyBtn({ c, inp }) {
       `환율: ${Number(inp.exchangeRate).toLocaleString("ko-KR")} ₩/$  /  Co: $${inp.coUSD}/lb  Ni: $${inp.niUSD}/ton  Li₂CO₃: $${inp.liUSD}/kg`,
       "",
       "【 Payable Rate 】",
-      `Co+Ni 기준 (일반시장):   ${c.ratioCoNi.toFixed(2)}%`,
-      `Co+Ni+Li 기준 (중국):    ${c.ratioCoNiLi.toFixed(2)}%`,
+      `Co+Ni 기준 (일반시장):   ${c.ratioCoNi.toFixed(1)}%`,
+      `Co+Ni+Li 기준 (중국):    ${c.ratioCoNiLi.toFixed(1)}%`,
       `매입단가 (₩/kg 환산):    ${Math.round(c.payable).toLocaleString("ko-KR")} ₩/kg`,
       "",
       "【 공헌이익(CM) 분석 】",
@@ -372,7 +372,7 @@ function Sheet3Tab({ inp, s }) {
 
   const tgtCoNi3 = num(inp.s3TargetCoNi);
   const pool3    = coNiCont3 * (tgtCoNi3 / 100);
-  const cnliA3   = totCont3 > 0 ? Math.round(tgtCoNi3 * (coNiCont3/totCont3) * 100) / 100 : 0;
+  const cnliA3   = totCont3 > 0 ? Math.round(tgtCoNi3 * (coNiCont3/totCont3) * 10) / 10 : 0;
   const cmA3     = maxPay3 - pool3;
 
   const coPay3 = num(inp.s3CoPay) / 100;
@@ -457,7 +457,7 @@ function Sheet3Tab({ inp, s }) {
                   우리 최대 CoNi Rate
                 </div>
                 <div style={{ fontSize:16, fontWeight:800, color:"#FCD34D" }}>
-                  {coNiCont3>0 ? (maxPay3/coNiCont3*100).toFixed(2)+"%" : "—"}
+                  {coNiCont3>0 ? (maxPay3/coNiCont3*100).toFixed(1)+"%" : "—"}
                 </div>
                 <div style={{ fontSize:9, color:"#475569" }}>최대매입단가 ÷ Co+Ni 함량가치</div>
               </div>
@@ -466,7 +466,7 @@ function Sheet3Tab({ inp, s }) {
                   우리 최대 CoNiLi Rate
                 </div>
                 <div style={{ fontSize:16, fontWeight:800, color:"#93C5FD" }}>
-                  {totCont3>0 ? (maxPay3/totCont3*100).toFixed(2)+"%" : "—"}
+                  {totCont3>0 ? (maxPay3/totCont3*100).toFixed(1)+"%" : "—"}
                 </div>
                 <div style={{ fontSize:9, color:"#475569" }}>최대매입단가 ÷ 전체 함량가치</div>
               </div>
@@ -851,7 +851,7 @@ function App() {
                         <div style={{ fontSize:11, color:C.dim }}>일반 시장 (국내·유럽·미국)</div>
                         <div style={{ fontSize:11, color:"#64748B" }}>= 최대매입단가 ÷ Co+Ni 함량가치 (회수율 미적용 기준)</div>
                       </div>
-                      <span style={{ fontSize:32, fontWeight:800, color:C.amber }}>{fp(c.ratioCoNi, 2)}</span>
+                      <span style={{ fontSize:32, fontWeight:800, color:C.amber }}>{fp(c.ratioCoNi, 1)}</span>
                     </div>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
                       padding:"8px 0", borderTop:"1px solid #E2E8F0", marginBottom:8 }}>
@@ -860,7 +860,7 @@ function App() {
                         <div style={{ fontSize:11, color:C.dim }}>중국 기준</div>
                         <div style={{ fontSize:11, color:"#94A3B8" }}>= 최대매입단가 ÷ Co+Ni+Li 함량가치</div>
                       </div>
-                      <span style={{ fontSize:32, fontWeight:800, color:"#93C5FD" }}>{fp(c.ratioCoNiLi, 2)}</span>
+                      <span style={{ fontSize:32, fontWeight:800, color:"#93C5FD" }}>{fp(c.ratioCoNiLi, 1)}</span>
                     </div>
                     <div style={{ padding:"7px 10px", background:"#F8FAFC", borderRadius:6,
                       display:"flex", justifyContent:"space-between", alignItems:"center" }}>
@@ -1265,14 +1265,14 @@ function App() {
                       <div style={{ fontSize:13, fontWeight:600, color:C.amber }}>Co+Ni 기준</div>
                       <div style={{ fontSize:11, color:C.muted }}>목표매입단가 ÷ Co+Ni 함량가치 (contained value)</div>
                     </div>
-                    <span style={{ fontSize:30, fontWeight:800, color:C.amber }}>{fp(tgtNum, 2)}</span>
+                    <span style={{ fontSize:30, fontWeight:800, color:C.amber }}>{fp(tgtNum, 1)}</span>
                   </div>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                     <div>
                       <div style={{ fontSize:13, fontWeight:600, color:"#1D4ED8" }}>Co+Ni+Li 기준 (중국)</div>
                       <div style={{ fontSize:11, color:C.muted }}>목표매입단가 ÷ 전체 함량가치 (contained value)</div>
                     </div>
-                    <span style={{ fontSize:30, fontWeight:800, color:"#1D4ED8" }}>{fp(tgtCoNiLi, 2)}</span>
+                    <span style={{ fontSize:30, fontWeight:800, color:"#1D4ED8" }}>{fp(tgtCoNiLi, 1)}</span>
                   </div>
                 </div>
               </div>
@@ -1398,7 +1398,7 @@ function App() {
                           </div>
                           <span style={{ fontSize:28, fontWeight:800,
                             color: !hasInput ? C.dim : C.blue }}>
-                            {hasInput && !isNaN(chEquiv) ? fp(chEquiv,2) : "—"}
+                            {hasInput && !isNaN(chEquiv) ? fp(chEquiv, 1) : "—"}
                           </span>
                         </div>
                       </div>
