@@ -195,7 +195,7 @@ function IRow({ label, value, onChange, unit, note, tags, accent, highlight, for
           {tags && tags.map(t => <Tag key={t} t={t} />)}
           {formula && <Fx id={label+unit} text={formula} />}
         </div>
-        {note && <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{note}</div>}
+        {note && <div style={{ fontSize:11, color:C.muted, marginTop:2, whiteSpace:"pre-line" }}>{note}</div>}
       </div>
       <input type="number" step="any" value={value} onClick={e=>e.stopPropagation()} onChange={e => onChange(e.target.value)}
         style={{ width:88, padding:"3px 7px", fontSize:14, textAlign:"right",
@@ -706,7 +706,7 @@ function Sheet4Tab({ inp, s }) {
   const secBg = "#F8FAFC";
 
   return (
-    <div style={{ padding:14, display:"grid", gridTemplateColumns:"320px 1fr", gap:14 }}>
+    <div style={{ padding:14, display:"grid", gridTemplateColumns:"260px 1fr", gap:14 }}>
 
       {/* ── 왼쪽 입력 ── */}
       <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
@@ -716,12 +716,12 @@ function Sheet4Tab({ inp, s }) {
           <Sec label="① 금속 시세 — 1시트 연동 (수정 가능)" color={C.blue} />
           <IRow label="기준 환율" value={inp.s4MetalEr} onChange={s("s4MetalEr")}
             unit="₩/$" note="메탈 시세 ₩ 환산용 · 기본값=1시트 환율" accent />
-          <CRow label="Co 시세" value={f0(num(inp.coUSD))} unit="$/lb" color={C.blue}
-            sub={"1시트 연동: "+inp.coUSD+"$/lb × 2.20462 × "+inp.s4MetalEr+" = "+f0(coP)+"₩/kg"} />
-          <CRow label="Ni 시세" value={f0(num(inp.niUSD))} unit="$/ton" color={C.blue}
-            sub={"1시트 연동: "+inp.niUSD+"$/ton → "+f0(niP)+"₩/kg"} />
-          <CRow label="Li₂CO₃ 시세" value={f0(num(inp.liUSD))} unit="$/kg" color={C.blue}
-            sub={"1시트 연동: "+inp.liUSD+"$/kg → "+f0(liP)+"₩/kg"} />
+          <IRow label="Co 시세" value={inp.coUSD} onChange={s("coUSD")}
+            unit="$/lb" note={"× 2.20462 × "+inp.s4MetalEr+" = "+f0(coP)+"₩/kg"} />
+          <IRow label="Ni 시세" value={inp.niUSD} onChange={s("niUSD")}
+            unit="$/ton" note={"÷ 1,000 × "+inp.s4MetalEr+" = "+f0(niP)+"₩/kg"} />
+          <IRow label="Li₂CO₃ 시세" value={inp.liUSD} onChange={s("liUSD")}
+            unit="$/kg" note={"× "+inp.s4MetalEr+" = "+f0(liP)+"₩/kg"} />
         </div>
 
         {/* 원료 조건 */}
@@ -738,9 +738,9 @@ function Sheet4Tab({ inp, s }) {
 
         {/* 우리 가공비 USD */}
         <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
-          <Sec label="③ 우리 가공비 — USD 입력 (제출 당시 환율)" color={C.purple} />
+          <Sec label="③ 우리 가공비 — USD 입력" color={C.purple} />
           <IRow label="제출 당시 환율" value={inp.s4OurEr} onChange={s("s4OurEr")}
-            unit="₩/$" note="우리가 가공비를 제출했을 때의 환율" highlight />
+            unit="₩/$" highlight />
           {[
             { label:"Co 가공비", key:"s4CoWetUSD", usd:coWU },
             { label:"Ni 가공비", key:"s4NiWetUSD", usd:niWU },
@@ -831,6 +831,13 @@ function Sheet4Tab({ inp, s }) {
                 <div style={{ fontSize:10, fontWeight:700, color:C.navy }}>{col.h}</div>
                 {col.sub&&<div style={{ fontSize:9, color:C.dim }}>{col.sub}</div>}
               </div>
+            ))}
+          </div>
+
+          {/* 산식 행 */}
+          <div style={{ display:"grid", gridTemplateColumns:"140px 80px 80px 130px 110px 110px 120px 30px", background:"#F8FAFC", borderBottom:"1px solid "+C.border }}>
+            {["경쟁사 USD가공비 =","경쟁사 환율","우리比 %","우리USD × 우리比%","USD가공비 × 환율","Output − ₩가공비","÷ CoNi함량가치 × 100",""].map((t,i) => (
+              <div key={i} style={{ padding:"4px 8px", borderRight:i<7?"1px solid "+C.border:"none", fontSize:9, color:C.dim, fontStyle:"italic" }}>{t}</div>
             ))}
           </div>
 
@@ -968,13 +975,79 @@ function Sheet4Tab({ inp, s }) {
         </div>
 
         {/* 주석 */}
-        <div style={{ padding:"10px 14px", background:"#F8FAFC", borderRadius:8,
-          border:"1px solid "+C.border, fontSize:10, color:C.muted, lineHeight:1.8 }}>
-          <b style={{color:C.navy}}>계산 방식</b><br/>
-          경쟁사 USD 가공비 = 우리 USD 가공비 × 우리比%<br/>
-          경쟁사 ₩ 가공비 = 경쟁사 USD 가공비 × <b>경쟁사 환율</b> (시점 차이 반영)<br/>
-          CoNi Rate = 경쟁사 최대매입단가 ÷ Co+Ni 함량가치 × 100<br/>
-          <span style={{color:"#DC2626"}}>※ 물류·기타비용 동일 가정 · 메탈시세 1시트 연동 · 금속시세 기준환율은 4시트에서 수정 가능</span>
+        <div style={{ padding:"14px 16px", background:"#F8FAFC", borderRadius:8,
+          border:"1px solid "+C.border }}>
+          <div style={{ fontSize:12, fontWeight:700, color:C.navy, marginBottom:10,
+            borderBottom:"1px solid "+C.border, paddingBottom:6 }}>
+            전체 계산 로직 및 수식
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+
+            {/* 행1 좌: ① 금속시세 */}
+            <div>
+              <div style={{ fontSize:11, fontWeight:700, color:C.blue, marginBottom:6 }}>
+                ① 금속시세 → ₩ 환산
+              </div>
+              <div style={{ fontSize:10, color:C.muted, lineHeight:1.9 }}>
+                Co 환산가 = Co($/lb) × 2.20462 × <b style={{color:C.blue}}>기준환율</b><br/>
+                Ni 환산가 = Ni($/ton) ÷ 1,000 × <b style={{color:C.blue}}>기준환율</b><br/>
+                Li₂CO₃ 환산가 = Li₂CO₃($/kg) × <b style={{color:C.blue}}>기준환율</b><br/>
+                <span style={{color:C.dim}}>※ 기준환율은 4시트 독립 입력 · Co/Ni/Li 시세는 1시트 연동</span>
+              </div>
+            </div>
+
+            {/* 행1 우: ③ 우리 가공비 */}
+            <div>
+              <div style={{ fontSize:11, fontWeight:700, color:C.purple, marginBottom:6 }}>
+                ③ 우리 가공비 → ₩ 환산
+              </div>
+              <div style={{ fontSize:10, color:C.muted, lineHeight:1.9 }}>
+                우리 ₩가공비 = Co회수량 × Co가공비($/kg) × <b style={{color:C.purple}}>우리환율</b><br/>
+                　　　　　　 + Ni회수량 × Ni가공비($/kg) × <b style={{color:C.purple}}>우리환율</b><br/>
+                　　　　　　 + Li회수량 × Li가공비($/kg) × <b style={{color:C.purple}}>우리환율</b><br/>
+                <span style={{color:C.dim}}>※ 우리환율 = 제출 당시 환율 (시점 차이 반영)</span>
+              </div>
+            </div>
+
+            {/* 행2 좌: ②③④ 원료조건 → Output/함량가치 */}
+            <div>
+              <div style={{ fontSize:11, fontWeight:700, color:C.green, marginBottom:6 }}>
+                ②③④ 원료 조건 → Output 가치 / 함량가치
+              </div>
+              <div style={{ fontSize:10, color:C.muted, lineHeight:1.9 }}>
+                <b style={{color:C.green}}>② 원료 조건 입력</b>: 분말화비율, Co/Ni/Li 함량%, 회수율%<br/>
+                Co 회수량(g/kg) = Co함량% × 분말화% × Co회수율%<br/>
+                Ni 회수량, Li 회수량도 동일 방식<br/>
+                <br/>
+                Output합계 = Co회수량×Co환산가 + Ni회수량×Ni환산가 + Li회수량×Li환산가<br/>
+                Co+Ni 함량가치 = Co함량%×분말화%×Co환산가 + Ni함량%×분말화%×Ni환산가<br/>
+                전체 함량가치 = Co+Ni 함량가치 + Li₂CO₃ 함량가치<br/>
+                <span style={{color:C.dim}}>※ 함량가치 = 회수율 미적용 · Payable Rate 분모</span>
+              </div>
+            </div>
+
+            {/* 행2 우: ⑤ 경쟁사 역산 */}
+            <div>
+              <div style={{ fontSize:11, fontWeight:700, color:C.amber, marginBottom:6 }}>
+                ⑤ 경쟁사 Payable Rate 역산
+              </div>
+              <div style={{ fontSize:10, color:C.muted, lineHeight:1.9 }}>
+                경쟁사 USD가공비 = 우리 USD가공비 × 우리比%<br/>
+                경쟁사 ₩가공비 = 경쟁사 USD가공비 × <b style={{color:C.amber}}>경쟁사 환율</b><br/>
+                경쟁사 최대매입단가 = Output합계 − 경쟁사 ₩가공비<br/>
+                CoNi Rate = 최대매입단가 ÷ Co+Ni 함량가치 × 100<br/>
+                CoNiLi Rate = 최대매입단가 ÷ 전체 함량가치 × 100<br/>
+                <span style={{color:"#DC2626"}}>※ 물류·기타비용은 동일하다고 가정</span>
+              </div>
+            </div>
+
+          </div>
+          <div style={{ marginTop:10, padding:"8px 12px", background:"#EFF6FF",
+            borderRadius:6, fontSize:10, color:"#1D4ED8" }}>
+            💡 환율 차이의 영향: 경쟁사가 더 낮은 환율 시점에 제출했다면
+            같은 USD 가공비라도 ₩ 환산가가 낮아져 Payable Rate가 높게 나옴
+            → <b>우리比%와 환율을 함께 조정해서 실질 경쟁력을 비교</b>
+          </div>
         </div>
       </div>
     </div>
