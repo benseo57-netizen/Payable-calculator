@@ -932,7 +932,7 @@
                   ["②③④ 원료조건 -> Output 및 함량가치", C.green,
                     "회수량(g/kg) = 함량% x 분말화% x 회수율% | 함량가치 = 함량% x 분말화% x 환산가 (회수율 미적용)"],
                   ["⑤ 경쟁사 Payable Rate 역산", C.amber,
-                    "경쟁사 가공비 = 우리 가공비 x 우리比% | 경쟁사 Rate = (Output - 경쟁사가공비) x CoNi함량가치"],
+                    "경쟁사 가공비 = 우리 가공비 x 우리比% | 경쟁사 Rate = (Output - 경쟁사가공비) ÷ CoNi함량가치"],
                 ].map(([title, color, desc], i) => (
                   <div key={i}>
                     <div style={{ fontSize:11, fontWeight:700, color:color, marginBottom:4 }}>{title}</div>
