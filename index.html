@@ -713,7 +713,7 @@
                     </div>
                     <div style={{ display:"flex", alignItems:"center", gap:2 }}>
                       <span style={{ fontSize:11, color:C.amber, fontWeight:700 }}>$</span>
-                      <input type="number" value={inp[row.key]} onChange={s(row.key)}
+                      <input type="number" value={inp[row.key]} onChange={e => s(row.key)(e.target.value)}
                         onClick={e=>e.stopPropagation()}
                         style={{ width:68, padding:"4px 6px", fontSize:13, fontWeight:700,
                           textAlign:"right", border:"1.5px solid "+C.amber, borderRadius:5,
