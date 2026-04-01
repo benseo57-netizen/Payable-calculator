@@ -621,7 +621,7 @@
         { name:"", er:"1340", pct:"101" },
       ]);
 
-      const metalEr = num(inp.s4MetalEr);
+      const metalEr = num(inp.exchangeRate)
       const coP = num(inp.coUSD) * 2.20462 * metalEr;
       const niP = num(inp.niUSD) / 1000 * metalEr;
       const liP = num(inp.liUSD) * metalEr;
