@@ -671,7 +671,7 @@
               {/* 1. 금속 시세 */}
               <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
                 <Sec label="① 금속 시세 — 1시트 연동 (수정 가능)" color={C.blue} />
-                <IRow label="기준 환율" value={inp.s4MetalEr} onChange={s("s4MetalEr")}
+                <IRow label="기준 환율" value={inp.exchangeRate} onChange={s("exchangeRate")}
                   unit="₩/$" note="메탈 시세 ₩ 환산용 · 기본값=1시트 환율" accent />
                 <IRow label="Co 시세" value={inp.coUSD} onChange={s("coUSD")}
                   unit="$/lb" note={"× 2.20462 × "+inp.s4MetalEr+" = "+f0(coP)+"₩/kg"} />
