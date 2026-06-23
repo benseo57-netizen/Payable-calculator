@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=1024">
   <title>Payable Rate 계산기</title>
   
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- 💡 안정적인 cdnjs 서버로 리액트 엔진 교체 -->
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
 
   <style>
     body {
@@ -18,23 +19,13 @@
     * {
       box-sizing: border-box;
     }
+    input[type=number] { -moz-appearance: textfield; }
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    button { outline: none; }
   </style>
-  <script>
-    // 우클릭 방지
-    document.addEventListener('contextmenu', function(e) {
-      e.preventDefault();
-    });
 
-    // F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U 방지
-    document.addEventListener('keydown', function(e) {
-      if (e.keyCode === 123 || // F12
-         (e.ctrlKey && e.shiftKey && e.keyCode === 73) || // Ctrl+Shift+I
-         (e.ctrlKey && e.shiftKey && e.keyCode === 74) || // Ctrl+Shift+J
-         (e.ctrlKey && e.keyCode === 85)) { // Ctrl+U
-        e.preventDefault();
-      }
-    });
-  </script>  
+  <!-- 💡 오류 확인을 위해 F12 우클릭 방어 코드 임시 비활성화 -->
 </head>
 <body>
   <div id="root"></div>
