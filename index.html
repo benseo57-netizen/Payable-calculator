@@ -242,7 +242,7 @@
       };
     }
 
-    // ── 중국 지불률 모듈 (2시트 하단 전용) ──
+    // ── 중국 지불률 환산 모듈 (반응형 오버플로우 해결) ──
     function ChCalcBlock({ inp, c, s }) {
       const er2    = num(inp.exchangeRate);
       const niSO4P = num(inp.niSO4Price) / 1000 * er2;
@@ -264,32 +264,36 @@
           <div style={{ padding:"6px 12px 4px", fontSize:11, color:C.muted, borderBottom:"1px solid "+C.border, marginBottom:10 }}>
             중국 시세는 증치세 제외(VAT-ex) 기준 입력 · NiSO₄·CoSO₄ 단위: USD/mt
           </div>
+          
           <div style={{ borderBottom:"1px solid "+C.border, marginBottom:10 }}>
             <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:4 }}>황산니켈 (NiSO₄) <span style={{fontSize:11, color:C.dim, fontWeight:400}}>Ni 22%</span></div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:0 }}>
+            <div className="main-grid" style={{ gap:10, marginBottom:10 }}>
               <IRow label="NiSO₄ 시세" value={inp.niSO4Price} onChange={s("niSO4Price")} unit="$/mt" />
               <IRow label="Ni 원재료" value={inp.chNiContent || inp.niContent} onChange={s("chNiContent")} unit="%" highlight />
               <IRow label="Ni 지불률" value={inp.niChPay} onChange={s("niChPay")} unit="%" />
             </div>
           </div>
+          
           <div style={{ borderBottom:"1px solid "+C.border, marginBottom:10 }}>
             <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:4 }}>황산코발트 (CoSO₄) <span style={{fontSize:11, color:C.dim, fontWeight:400}}>Co 20.5%</span></div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:0 }}>
+            <div className="main-grid" style={{ gap:10, marginBottom:10 }}>
               <IRow label="CoSO₄ 시세" value={inp.coSO4Price} onChange={s("coSO4Price")} unit="$/mt" />
               <IRow label="Co 원재료" value={inp.chCoContent || inp.coContent} onChange={s("chCoContent")} unit="%" highlight />
               <IRow label="Co 지불률" value={inp.coChPay} onChange={s("coChPay")} unit="%" />
             </div>
           </div>
+          
           <div style={{ borderBottom:"1px solid "+C.border, marginBottom:10 }}>
             <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:4 }}>탄산리튬 (Li₂CO₃) <span style={{fontSize:11, color:C.dim, fontWeight:400}}>Li 18.8%</span></div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:0 }}>
+            <div className="main-grid" style={{ gap:10, marginBottom:10 }}>
               <IRow label="Li₂CO₃ 시세" value={inp.liCO3Price} onChange={s("liCO3Price")} unit="$/mt" />
               <IRow label="Li 원재료" value={inp.chLiContent || inp.liContent} onChange={s("chLiContent")} unit="%" highlight />
               <IRow label="Li 지불률" value={inp.liChPay} onChange={s("liChPay")} unit="%" />
             </div>
           </div>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:14 }}>
-            <div>
+          
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", marginTop:14 }}>
+            <div style={{ marginBottom:6 }}>
               <div style={{ fontSize:11, color:C.muted, marginBottom:3 }}>중국 총지급액</div>
               <div style={{ fontSize:20, fontWeight:800, color:C.text }}>{hasInput ? f0(totalCh)+" ₩/kg" : "—"}</div>
             </div>
@@ -301,8 +305,9 @@
               </span>
             </div>
           </div>
+          
           {hasInput && (
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6, marginTop:10 }}>
+            <div className="main-grid" style={{ gap:10, marginTop:10 }}>
               {[ { label:"Ni 기여", val:niChKg, color:"#1D4ED8" }, { label:"Co 기여", val:coChKg, color:C.amber }, { label:"Li 기여", val:liChKg, color:C.green } ].map((item,i) => (
                 <div key={i} style={{ padding:"6px 8px", background:"#EFF6FF", borderRadius:6, border:"1px solid #DBEAFE" }}>
                   <div style={{ fontSize:11, color:C.muted }}>{item.label}</div>
@@ -315,11 +320,104 @@
       );
     }
 
-    // ── 3시트 컴포넌트 ──
-    function Sheet3Tab({ inp, s, s3Slots, setS3Slots, s3Name, setS3Name, s3AutoTarget, setS3AutoTarget, c }) {
+    // ── 통짜 오리지널 App 컴포넌트 ──
+    function App() {
+      const [tab, setTab] = useState(0);
+      const [fxId, setFxId] = useState(null);
+      const [chShow, setChShow] = useState(false);
+
+      const [tgtMode, setTgtMode] = useState("CoNi"); 
+      const [tgtVal, setTgtVal]   = useState("90");
+
+      const [s1Slots, setS1Slots] = useState(Array(5).fill(null));
+      const [s1Name, setS1Name] = useState("");
+      const [s3Slots, setS3Slots] = useState(Array(5).fill(null));
+      const [s3Name, setS3Name] = useState("");
+      const [s3AutoTarget, setS3AutoTarget] = useState("ni");
+
+      const [comps, setComps] = useState([
+        { name:"", er:"1340", pct:"80" }, { name:"", er:"1340", pct:"45" }, { name:"", er:"1340", pct:"51" }
+      ]);
+
+      const [inp, setInp] = useState({
+        exchangeRate:"1530.11", coUSD:"25.53", niUSD:"17650", liUSD:"22.50",
+        dealVolume:"100", powderRatio:"100",
+        coContent:"2.57", niContent:"29.39", liContent:"4.16",
+        coRecovery:"95", niRecovery:"95", liRecovery:"90",
+        coWetCost:"13300", niWetCost:"11700", liWetCost:"9450",
+        preProcessCost:"0", localLogistics:"0", intlLogistics:"0", krLocalLogistics:"0",
+        calcinationCost:"0", otherVarCost:"0", byproductRevenue:"0", targetMargin:"0",
+        marketRatioCoNi:"105", marketRatioCoNiLi:"0", mktMode:"CoNi",
+        niSO4Price:"0", coSO4Price:"0", liCO3Price:"0",
+        niChPay:"0", coChPay:"0", liChPay:"0", chNiContent:"", chCoContent:"", chLiContent:"",
+        s3TargetCoNi:"88", s3CoPay:"15", s3NiPay:"20", s3LiPay:"20",
+        s4OurEr:"1340", s4PowderRatio:"100", s4CoContent:"3.0", s4NiContent:"25.0", s4LiContent:"3.384",
+        s4CoRecovery:"95", s4NiRecovery:"95", s4LiRecovery:"90",
+        s4CoWetUSD:"8.96", s4NiWetUSD:"7.31", s4LiWetUSD:"6.87",
+      });
+
+      const s = k => v => setInp(p => ({ ...p, [k]: v }));
+      
+      const c = compute(inp);
+
+      const saveS1 = (idx) => {
+        if(!s1Name.trim()) { alert("저장할 이름을 입력해주세요."); return; }
+        const newSlots = [...s1Slots];
+        newSlots[idx] = { 
+          name: s1Name, dealVolume: inp.dealVolume, powderRatio: inp.powderRatio, 
+          coContent: inp.coContent, niContent: inp.niContent, liContent: inp.liContent, 
+          ratioCoNi: c.ratioCoNi, payable: c.payable, trueMarginPct: c.trueMarginPct, 
+          totalPayoutKRW: c.totalPayoutKRW, totalMarginKRW: c.totalMarginKRW,
+          marginBase: c.marginBase, cmKg: c.cmKg
+        };
+        setS1Slots(newSlots); setS1Name("");
+      };
+
+      const loadS1 = (idx) => {
+        const slot = s1Slots[idx];
+        if(!slot) return;
+        setInp(p => ({ ...p, dealVolume: slot.dealVolume, powderRatio: slot.powderRatio, 
+          coContent: slot.coContent, niContent: slot.niContent, liContent: slot.liContent }));
+      };
+
+      const copyS1 = () => {
+        let text = "━━━━━━━━━━━━\n📊 Payable Rate 분석 결과\n━━━━━━━━━━━━\n\n";
+        text += `【 현재 시뮬레이션 중인 조건 】\n`;
+        text += `  • 물량/분말화: ${inp.dealVolume}톤 / ${inp.powderRatio}%\n`;
+        text += `  • 함량: Co ${inp.coContent}% | Ni ${inp.niContent}% | Li ${inp.liContent}%\n`;
+        text += `  • 지불률(CoNi): ${c.ratioCoNi.toFixed(1)}%\n`;
+        text += `  • 매입단가: ${f0(c.payable)} ₩/kg\n`;
+        text += `  • 총 지불액: ${fa(c.totalPayoutKRW)}\n`;
+        text += `  • 마진율: ${c.marginBase>0 ? (c.cmKg/c.marginBase*100).toFixed(1) : 0}% (${fa(c.totalMarginKRW)})\n\n`;
+
+        s1Slots.forEach((slot, i) => {
+          if (slot) {
+            text += `【 슬롯 ${i+1}: ${slot.name} 】\n`;
+            text += `  • 물량/분말화: ${slot.dealVolume}톤 / ${slot.powderRatio}%\n`;
+            text += `  • 함량: Co ${slot.coContent}% | Ni ${slot.niContent}% | Li ${slot.liContent}%\n`;
+            text += `  • 지불률(CoNi): ${slot.ratioCoNi.toFixed(1)}%\n`;
+            text += `  • 매입단가: ${f0(slot.payable)} ₩/kg\n`;
+            text += `  • 총 지불액: ${fa(slot.totalPayoutKRW)}\n`;
+            text += `  • 마진율: ${slot.marginBase>0 ? (slot.cmKg/slot.marginBase*100).toFixed(1) : 0}% (${fa(slot.totalMarginKRW)})\n\n`;
+          }
+        });
+        navigator.clipboard.writeText(text.trim()).then(() => alert("✅ 1시트 결과가 복사되었습니다."));
+      };
+
+      // ── 2시트 연산 ──
+      const tgtNum = num(tgtVal);
+      const tgtPayable = tgtMode === "CoNi" ? c.coNiContained * (tgtNum / 100) : c.totContained * (tgtNum / 100);
+      const displayCoNi = tgtMode === "CoNi" ? tgtVal : (c.totContained > 0 && c.coNiContained > 0 ? (tgtNum * c.totContained / c.coNiContained).toFixed(1) : "");
+      const displayCoNiLi = tgtMode === "CoNiLi" ? tgtVal : (c.totContained > 0 && c.coNiContained > 0 ? (tgtNum * c.coNiContained / c.totContained).toFixed(1) : "");
+      const numCoNi = num(displayCoNi);
+      const numCoNiLi = num(displayCoNiLi);
+      
+      const allowedWet = c.totOut - tgtPayable - c.tgtMarginAmt - num(inp.preProcessCost) - num(inp.localLogistics) - num(inp.intlLogistics)*c.pr - num(inp.krLocalLogistics)*c.pr - num(inp.calcinationCost)*c.pr - num(inp.otherVarCost) + c.byproduct; 
+
+      // ── 3시트 연산 ──
       const pool3 = c.coNiContained * (num(inp.s3TargetCoNi) / 100);
       const maxPay3 = c.totOut - c.totVar - c.tgtMarginAmt;
-      
+
       let finalCoPay3 = num(inp.s3CoPay);
       let finalNiPay3 = num(inp.s3NiPay);
       let finalLiPay3 = num(inp.s3LiPay);
@@ -378,322 +476,42 @@
         navigator.clipboard.writeText(text.trim()).then(() => alert("✅ 3시트 결과가 복사되었습니다."));
       };
 
-      return (
-        <div>
-          <div className="sheet3-grid">
-            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-              <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
-                <Sec label="① 원료 조건 — 1시트 연동" color={C.blue} />
-                <CRow label="Co 환산가" value={f0(c.coP)} unit="₩/kg" color={C.amber} sub={"Co "+inp.coUSD+"$/lb × 2.20462 × "+inp.exchangeRate} />
-                <CRow label="Ni 환산가" value={f0(c.niP)} unit="₩/kg" color={C.blue} sub={"Ni "+inp.niUSD+"$/ton ÷ 1,000 × "+inp.exchangeRate} />
-                <CRow label="Li₂CO₃ 환산가" value={f0(c.liP)} unit="₩/kg" color={C.green} sub={"Li₂CO₃ "+inp.liUSD+"$/kg × "+inp.exchangeRate} />
-                <CRow label="분말화비율" value={inp.powderRatio+"%"} unit="" />
-                <CRow label="Co / Ni / Li 함량" value={inp.coContent+"% / "+inp.niContent+"% / "+inp.liContent+"%"} unit="" />
-                <CRow label="Co / Ni / Li 회수율" value={inp.coRecovery+"% / "+inp.niRecovery+"% / "+inp.liRecovery+"%"} unit="" />
-              </div>
+      // ── 4시트 연산 ──
+      const metalEr4 = num(inp.exchangeRate);
+      const coP4 = num(inp.coUSD) * 2.20462 * metalEr4; const niP4 = num(inp.niUSD) / 1000 * metalEr4; const liP4 = num(inp.liUSD) * metalEr4;
+      const pr4  = num(inp.s4PowderRatio) / 100;
+      const coC4 = num(inp.s4CoContent) / 100; const niC4 = num(inp.s4NiContent) / 100; const liC4 = num(inp.s4LiContent) / 100;
+      const cor4 = num(inp.s4CoRecovery) / 100; const nir4 = num(inp.s4NiRecovery) / 100; const lir4 = num(inp.s4LiRecovery) / 100;
+      const ourEr4 = num(inp.s4OurEr);
+      const coWU4 = num(inp.s4CoWetUSD); const niWU4 = num(inp.s4NiWetUSD); const liWU4 = num(inp.s4LiWetUSD);
 
-              <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
-                <Sec label="② 가공비 — 1시트 연동" color={C.purple} />
-                <CRow label="Co 습식가공비" value={f0(num(inp.coWetCost))} unit="₩/kg-Co" color={C.purple} />
-                <CRow label="Ni 습식가공비" value={f0(num(inp.niWetCost))} unit="₩/kg-Ni" color={C.purple} />
-                <CRow label="Li 습식가공비" value={f0(num(inp.liWetCost))} unit="₩/kg-Li" color={C.purple} />
-                <CRow label="전처리 가공비" value={f0(c.preV)} unit="₩/kg-스크랩" color={C.purple} />
-                <CRow label="로컬 물류비" value={f0(c.localV)} unit="₩/kg-스크랩" color={C.purple} />
-                <CRow label="국제 운임/소성 합계" value={f0(c.intlV*c.pr + c.krV*c.pr + c.calcV*c.pr + c.otherV)} unit="₩/kg-스크랩" color={C.purple} />
-                <CRow label="비용 합계 (부산물 차감 후)" value={f0(c.totVar)} unit="₩/kg-스크랩" color={C.red} bold />
-              </div>
-            </div>
+      const coOut4  = coC4*pr4*cor4; const niOut4 = niC4*pr4*nir4; const liOut4  = liC4*LI_CONV*pr4*lir4;
+      const totOut4 = coOut4*coP4 + niOut4*niP4 + liOut4*liP4;
+      const coCont4 = coC4*pr4*coP4; const niCont4=niC4*pr4*niP4; const liCont4 = liC4*LI_CONV*pr4*liP4;
+      const coNiCont4 = coCont4+niCont4; const totCont4=coNiCont4+liCont4;
 
-            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-              <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
-                <Sec label="③ 원재료 내 함량가치" color={C.green} />
-                <CRow label="Co 함량가치" value={f0(c.coContained)} unit="₩/kg" color={C.amber} />
-                <CRow label="Ni 함량가치" value={f0(c.niContained)} unit="₩/kg" color={C.blue} />
-                <CRow label="Li₂CO₃ 함량가치" value={f0(c.liContained)} unit="₩/kg" color={C.green} />
-                <CRow label="Co+Ni 함량가치" value={f0(c.coNiContained)} unit="₩/kg" bold color={C.blue} />
-                <CRow label="전체 함량가치"  value={f0(c.totContained)}  unit="₩/kg" bold color={C.green} />
-                <div style={{ background:"#0F172A", padding:"10px 14px" }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                    <div><div style={{ fontSize:12, color:"#94A3B8", fontWeight:600 }}>최대 허용 매입단가</div><div style={{ fontSize:10, color:"#475569" }}>Output {f0(c.totOut)} - 비용 {f0(c.totVar)}</div></div>
-                    <span style={{ fontSize:20, fontWeight:800, color:"#FCD34D" }}>{f0(maxPay3)} ₩/kg</span>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
-                <Sec label="④ CoNi Rate 입력 -> 지급 풀 환산" color={C.amber} />
-                <div style={{ padding:"12px 14px", background:"#FFFBEB", borderBottom:"1px solid "+C.border }}>
-                  <div style={{ fontSize:11, color:C.amber, fontWeight:700, marginBottom:8 }}>상대방 제안 CoNi 지불률</div>
-                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
-                    <input type="number" value={inp.s3TargetCoNi} onChange={e => s("s3TargetCoNi")(e.target.value)} onClick={e=>e.stopPropagation()} style={{ width:80, fontSize:26, fontWeight:800, textAlign:"center", border:"2px solid "+C.amber, borderRadius:8, padding:"6px", background:"#FFFFFF", color:C.text, outline:"none" }} />
-                    <span style={{ fontSize:22, fontWeight:800, color:C.amber }}>%</span>
-                  </div>
-                  <div style={{ fontSize:11, color:C.muted }}>총 지급 풀 = <b style={{ color:C.amber, fontSize:13 }}>{f0(pool3)} ₩/kg</b></div>
-                </div>
-                
-                <div style={{ padding:"12px 14px", background:"#EFF6FF", borderBottom:"1px solid "+C.border }}>
-                  <div style={{ fontSize:12, fontWeight:700, color:C.blue, marginBottom:6 }}>🔄 자동 역산 메탈 선택 (잔여 풀 배분 대상)</div>
-                  <div style={{ display:"flex", gap:15, fontSize:13 }}>
-                    <label style={{ cursor:"pointer", fontWeight:s3AutoTarget==="ni"?700:400, color:s3AutoTarget==="ni"?C.blue:C.text }}><input type="radio" checked={s3AutoTarget === "ni"} onChange={() => setS3AutoTarget("ni")} style={{marginRight:4}} /> Ni 자동</label>
-                    <label style={{ cursor:"pointer", fontWeight:s3AutoTarget==="co"?700:400, color:s3AutoTarget==="co"?C.amber:C.text }}><input type="radio" checked={s3AutoTarget === "co"} onChange={() => setS3AutoTarget("co")} style={{marginRight:4}} /> Co 자동</label>
-                    <label style={{ cursor:"pointer", fontWeight:s3AutoTarget==="li"?700:400, color:s3AutoTarget==="li"?C.green:C.text }}><input type="radio" checked={s3AutoTarget === "li"} onChange={() => setS3AutoTarget("li")} style={{marginRight:4}} /> Li 자동</label>
-                  </div>
-                </div>
-
-                <div style={{ padding:10, borderTop:"1px dashed "+C.border }}>
-                  <div style={{ fontSize:11, fontWeight:700, marginBottom:4 }}>💾 시나리오 저장</div>
-                  <input value={s3Name} onChange={e=>setS3Name(e.target.value)} placeholder="이름 (예: A사 제안안)" style={{width:"100%", padding:6, fontSize:12, border:"1px solid "+C.border, borderRadius:4, marginBottom:6, outline:"none"}}/>
-                  <div style={{ display:"grid", gridTemplateColumns:"repeat(5, 1fr)", gap:4 }}>
-                    {[0,1,2,3,4].map(idx => <button key={idx} onClick={() => saveS3(idx)} style={{ padding:"6px 0", fontSize:11, fontWeight:700, cursor:"pointer", background:s3Slots[idx]?"#D1FAE5":"#E2E8F0", border:"1px solid "+(s3Slots[idx]?"#10B981":C.border), color:s3Slots[idx]?C.green:C.text, borderRadius:4 }}>S{idx+1}</button>)}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-              <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
-                <Sec label="⑤ 메탈별 지불률 자동 역산" color={C.purple} />
-                <IRow label="Co 지불률" value={inp.s3CoPay} onChange={s("s3CoPay")} unit="%" highlight={s3AutoTarget!=="co"} accent={s3AutoTarget==="co"} />
-                <div style={{ padding:"3px 10px 6px", background:C.secBg, fontSize:11, color:C.muted, borderBottom:"1px solid "+C.border }}>
-                  {s3AutoTarget === "co" ? `🔄 자동 역산가: ${f0(c.coContained * finalCoPay3/100)}₩` : `기여액: ${f0(c.coContained * finalCoPay3/100)}₩`}
-                </div>
-                <IRow label="Ni 지불률" value={inp.s3NiPay} onChange={s("s3NiPay")} unit="%" highlight={s3AutoTarget!=="ni"} accent={s3AutoTarget==="ni"} />
-                <div style={{ padding:"3px 10px 6px", background:C.secBg, fontSize:11, color:C.muted, borderBottom:"1px solid "+C.border }}>
-                  {s3AutoTarget === "ni" ? `🔄 자동 역산가: ${f0(c.niContained * finalNiPay3/100)}₩` : `기여액: ${f0(c.niContained * finalNiPay3/100)}₩`}
-                </div>
-                <IRow label="Li 지불률" value={inp.s3LiPay} onChange={s("s3LiPay")} unit="%" highlight={s3AutoTarget!=="li"} accent={s3AutoTarget==="li"} />
-                <div style={{ padding:"3px 10px 6px", background:C.secBg, fontSize:11, color:C.muted, borderBottom:"1px solid "+C.border }}>
-                  {s3AutoTarget === "li" ? `🔄 자동 역산가: ${f0(c.liContained * finalLiPay3/100)}₩` : `기여액: ${f0(c.liContained * finalLiPay3/100)}₩`}
-                </div>
-
-                <div style={{ padding:12, background:niNeg3?"#FEF2F2":"#ECFDF5", textAlign:"center", marginTop:10 }}>
-                  <div style={{ fontSize:12, fontWeight:700, color:niNeg3?C.red:C.green }}>메탈별 지불률 요약</div>
-                  <div style={{ fontSize:16, fontWeight:800, color:niNeg3?C.red:C.purple, marginTop:5 }}>
-                    {niNeg3 ? "⚠ 배분 한도 초과 (조정 필요)" : `Co ${f1(finalCoPay3)}% / Ni ${f1(finalNiPay3)}% / Li ${f1(finalLiPay3)}%`}
-                  </div>
-                </div>
-
-                <div style={{ margin:"12px", padding:"10px 12px", borderRadius:8, background:cmB3>=0?"#DCFCE7":"#FEF2F2", border:"1px solid "+(cmB3>=0?"#86EFAC":"#FECACA") }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                    <div><div style={{ fontSize:11, color:C.muted }}>마진율</div><div style={{ fontSize:10, color:C.dim }}>최대허용단가 - 지급액</div></div>
-                    <div style={{ textAlign:"right" }}><div style={{ fontSize:22, fontWeight:800, color:cmB3>=0?C.green:C.red }}>{f1(trueMarginPct3)} %</div></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ marginTop:14, background:C.card, padding:16, borderRadius:10, border:"1px solid "+C.border }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12, borderBottom:"2px solid "+C.border, paddingBottom:6 }}>
-              <div style={{ fontSize:14, fontWeight:800, color:C.navy }}>📥 시뮬레이션 보관함</div>
-              <button onClick={copyS3} style={{ padding:"6px 14px", fontSize:12, fontWeight:700, background:"#1E293B", color:"#FFF", border:"none", borderRadius:4, cursor:"pointer" }}>📋 결과 복사 (전체 요약)</button>
-            </div>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))", gap:10 }}>
-              {s3Slots.map((slot, idx) => (
-                <div key={idx} style={{ background:slot?"#F0FDF4":C.secBg, border:"1px solid "+C.border, borderRadius:8, padding:10 }}>
-                  <div style={{ fontSize:12, fontWeight:800, color:C.blue, marginBottom:6 }}>슬롯 {idx+1} {slot ? `[${slot.name}]` : ""}</div>
-                  {slot ? (
-                    <div style={{ fontSize:11, lineHeight:1.5 }}>
-                      <div>지불률: <b style={{color:C.purple}}>{f1(slot.coPay)}% / {f1(slot.niPay)}% / {f1(slot.liPay)}%</b></div>
-                      <div style={{marginTop:2}}>마진율: <span style={{fontWeight:700, color:C.green}}>{f1(slot.trueMarginPct3)}%</span></div>
-                      <button onClick={() => loadS3(idx)} style={{ width:"100%", marginTop:8, padding:"4px 0", fontSize:11, fontWeight:700, background:"#FFF", border:"1px solid "+C.border, borderRadius:4, cursor:"pointer" }}>🔄 불러오기</button>
-                    </div>
-                  ) : <div style={{ fontSize:11, color:C.dim, textAlign:"center", padding:"15px 0" }}>데이터 없음</div>}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // ── 4시트 컴포넌트 ──
-    function Sheet4Tab({ inp, s }) {
-      const [comps, setComps] = useState([
-        { name:"", er:"1340", pct:"80" }, { name:"", er:"1340", pct:"45" }, { name:"", er:"1340", pct:"51" }
-      ]);
-      const metalEr = num(inp.exchangeRate);
-      const coP = num(inp.coUSD) * 2.20462 * metalEr; const niP = num(inp.niUSD) / 1000 * metalEr; const liP = num(inp.liUSD) * metalEr;
-      const pr  = num(inp.s4PowderRatio) / 100;
-      const coC = num(inp.s4CoContent) / 100; const niC = num(inp.s4NiContent) / 100; const liC = num(inp.s4LiContent) / 100;
-      const cor = num(inp.s4CoRecovery) / 100; const nir = num(inp.s4NiRecovery) / 100; const lir = num(inp.s4LiRecovery) / 100;
-      const ourEr = num(inp.s4OurEr);
-      const coWU = num(inp.s4CoWetUSD); const niWU = num(inp.s4NiWetUSD); const liWU = num(inp.s4LiWetUSD);
-
-      const coOut  = coC*pr*cor; const niOut = niC*pr*nir; const liOut  = liC*LI_CONV*pr*lir;
-      const totOut = coOut*coP + niOut*niP + liOut*liP;
-      const coCont = coC*pr*coP; const niCont=niC*pr*niP; const liCont = liC*LI_CONV*pr*liP;
-      const coNiCont = coCont+niCont; const totCont=coNiCont+liCont;
-
-      const ourWetUSD = coOut*coWU + niOut*niWU + liOut*liWU;
-      const ourWetKRW = coOut*coWU*ourEr + niOut*niWU*ourEr + liOut*liWU*ourEr;
-      const ourMax    = totOut - ourWetKRW;
-      const ourCoNi   = coNiCont>0 ? Math.round(ourMax/coNiCont*100) : NaN;
-      const ourCnli   = totCont>0 ? Math.round(ourMax/totCont*100) : NaN;
+      const ourWetUSD4 = coOut4*coWU4 + niOut4*niWU4 + liOut4*liWU4;
+      const ourWetKRW4 = coOut4*coWU4*ourEr4 + niOut4*niWU4*ourEr4 + liOut4*liWU4*ourEr4;
+      const ourMax4    = totOut4 - ourWetKRW4;
+      const ourCoNi4   = coNiCont4>0 ? (ourMax4/coNiCont4)*100 : NaN;
+      const ourCnli4   = totCont4>0 ? (ourMax4/totCont4)*100 : NaN;
 
       const updateComp = (i,field,val) => setComps(prev => prev.map((c,idx) => idx===i ? {...c,[field]:val} : c));
       const addComp    = () => setComps(prev => [...prev,{name:"",er:"1449",pct:"100"}]);
       const removeComp = i  => setComps(prev => prev.filter((_,idx)=>idx!==i));
 
       return (
-        <div style={{ padding:14, display:"flex", flexDirection:"column", gap:14 }}>
-          <div className="sheet4-grid">
-            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-              <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
-                <Sec label="① 금속 시세 (1시트 연동)" color={C.blue} />
-                <IRow label="기준 환율" value={inp.exchangeRate} onChange={s("exchangeRate")} unit="₩/$" accent />
-                <IRow label="Co 시세" value={inp.coUSD} onChange={s("coUSD")} unit="$/lb" />
-                <IRow label="Ni 시세" value={inp.niUSD} onChange={s("niUSD")} unit="$/ton" />
-                <IRow label="Li₂CO₃ 시세" value={inp.liUSD} onChange={s("liUSD")} unit="$/kg" />
-              </div>
-              <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
-                <Sec label="② 원료 조건" color={C.blue} />
-                <IRow label="분말화비율" value={inp.s4PowderRatio} onChange={s("s4PowderRatio")} unit="%" />
-                <IRow label="Co 함량" value={inp.s4CoContent} onChange={s("s4CoContent")} unit="%" />
-                <IRow label="Ni 함량" value={inp.s4NiContent} onChange={s("s4NiContent")} unit="%" />
-                <IRow label="Li 함량" value={inp.s4LiContent} onChange={s("s4LiContent")} unit="%" />
-              </div>
-            </div>
-            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-              <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
-                <Sec label="③ 우리 가공비 (USD 입력)" color={C.purple} />
-                <IRow label="제출 당시 환율" value={inp.s4OurEr} onChange={s("s4OurEr")} unit="₩/$" highlight />
-                <IRow label="Co 가공비" value={inp.s4CoWetUSD} onChange={s("s4CoWetUSD")} unit="$" />
-                <IRow label="Ni 가공비" value={inp.s4NiWetUSD} onChange={s("s4NiWetUSD")} unit="$" />
-                <IRow label="Li 가공비" value={inp.s4LiWetUSD} onChange={s("s4LiWetUSD")} unit="$" />
-                <CRow label="가공비 합계 (₩)" value={f0(ourWetKRW)} unit="₩/kg" color={C.purple} bold />
-              </div>
-              <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
-                <Sec label="④ 우리 최대 Payable Rate" color={C.green} />
-                <CRow label="Output 합계" value={f0(totOut)} unit="₩/kg" color={C.green} />
-                <div style={{ background:"#0F172A", padding:"8px 12px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-                  <div style={{ textAlign:"center" }}><div style={{ fontSize:10, color:"#94A3B8" }}>우리 최대 CoNi Rate</div><div style={{ fontSize:22, fontWeight:800, color:"#FCD34D" }}>{fp(ourCoNi)}</div></div>
-                  <div style={{ textAlign:"center" }}><div style={{ fontSize:10, color:"#94A3B8" }}>우리 최대 CoNiLi Rate</div><div style={{ fontSize:22, fontWeight:800, color:"#93C5FD" }}>{fp(ourCnli)}</div></div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden", overflowX:"auto" }}>
-            <div style={{ padding:"10px 14px", background:"#1E293B", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <div style={{ fontSize:13, fontWeight:700, color:"#F8FAFC" }}>⑤ 경쟁사 Payable Rate 역산</div>
-              <button onClick={addComp} style={{ padding:"6px 14px", background:"#1D4ED8", color:"#fff", border:"none", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>+ 경쟁사 추가</button>
-            </div>
-            {comps.map((comp,i) => {
-              const compEr = num(comp.er); const pctN = num(comp.pct)/100;
-              const cpWetKRW = coOut*(coWU*pctN)*compEr + niOut*(niWU*pctN)*compEr + liOut*(liWU*pctN)*compEr;
-              const cpMax = totOut - cpWetKRW;
-              const cpCoNi = coNiCont>0 ? Math.round(cpMax/coNiCont*100) : NaN;
-              return (
-                <div key={i} style={{ display:"grid", gridTemplateColumns:"minmax(120px, 1fr) 100px 100px 100px 100px 50px", gap:10, padding:10, borderBottom:"1px solid "+C.border, alignItems:"center", background:i%2===0?"#FFF":C.secBg }}>
-                  <input value={comp.name} onChange={e=>updateComp(i,"name",e.target.value)} placeholder={`경쟁사 ${i+1}`} style={{padding:6, border:"1px solid "+C.border, borderRadius:4, outline:"none"}}/>
-                  <input type="number" value={comp.er} onChange={e=>updateComp(i,"er",e.target.value)} placeholder="환율" style={{padding:6, border:"1px solid "+C.border, borderRadius:4, outline:"none"}}/>
-                  <div style={{display:"flex", alignItems:"center"}}><input type="number" value={comp.pct} onChange={e=>updateComp(i,"pct",e.target.value)} style={{width:"100%", padding:6, border:"1.5px solid "+C.amber, borderRadius:4, outline:"none"}}/><span style={{marginLeft:4, fontSize:12}}>%</span></div>
-                  <div style={{fontSize:12, fontWeight:700, color:cpWetKRW<ourWetKRW?C.green:C.red}}>{f0(cpWetKRW)}₩</div>
-                  <div><span style={{fontSize:16, fontWeight:800, color:(cpCoNi-ourCoNi)>0?C.red:C.green}}>{fp(cpCoNi)}</span></div>
-                  <button onClick={()=>removeComp(i)} style={{background:"transparent", border:"none", color:C.dim, cursor:"pointer", fontSize:16}}>✕</button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
-
-    // ── 메인 App 라우터 (최상위) ──
-    function App() {
-      const [tab, setTab] = useState(0);
-      const [fxId, setFxId] = useState(null);
-      const [chShow, setChShow] = useState(false);
-
-      const [tgtMode, setTgtMode] = useState("CoNi"); 
-      const [tgtVal, setTgtVal]   = useState("90");
-
-      const [s1Slots, setS1Slots] = useState(Array(5).fill(null));
-      const [s1Name, setS1Name] = useState("");
-      const [s3Slots, setS3Slots] = useState(Array(5).fill(null));
-      const [s3Name, setS3Name] = useState("");
-      const [s3AutoTarget, setS3AutoTarget] = useState("ni");
-
-      const [inp, setInp] = useState({
-        exchangeRate:"1530.11", coUSD:"25.53", niUSD:"17650", liUSD:"22.50",
-        dealVolume:"100", powderRatio:"100",
-        coContent:"2.57", niContent:"29.39", liContent:"4.16",
-        coRecovery:"95", niRecovery:"95", liRecovery:"90",
-        coWetCost:"13300", niWetCost:"11700", liWetCost:"9450",
-        preProcessCost:"0", localLogistics:"0", intlLogistics:"0", krLocalLogistics:"0",
-        calcinationCost:"0", otherVarCost:"0", byproductRevenue:"0", targetMargin:"0",
-        marketRatioCoNi:"105", marketRatioCoNiLi:"0", mktMode:"CoNi",
-        niSO4Price:"0", coSO4Price:"0", liCO3Price:"0",
-        niChPay:"0", coChPay:"0", liChPay:"0", chNiContent:"", chCoContent:"", chLiContent:"",
-        s3TargetCoNi:"88", s3CoPay:"15", s3NiPay:"20", s3LiPay:"20",
-        s4OurEr:"1340", s4PowderRatio:"100", s4CoContent:"3.0", s4NiContent:"25.0", s4LiContent:"3.384",
-        s4CoRecovery:"95", s4NiRecovery:"95", s4LiRecovery:"90",
-        s4CoWetUSD:"8.96", s4NiWetUSD:"7.31", s4LiWetUSD:"6.87",
-      });
-
-      const s = k => v => setInp(p => ({ ...p, [k]: v }));
-      
-      const c = compute(inp);
-
-      const saveS1 = (idx) => {
-        if(!s1Name.trim()) { alert("이름을 입력해주세요."); return; }
-        const newSlots = [...s1Slots];
-        newSlots[idx] = { name: s1Name, dealVolume: inp.dealVolume, powderRatio: inp.powderRatio, coContent: inp.coContent, niContent: inp.niContent, liContent: inp.liContent, ratioCoNi: c.ratioCoNi, payable: c.payable, trueMarginPct: c.trueMarginPct, totalPayoutKRW: c.totalPayoutKRW, totalMarginKRW: c.totalMarginKRW, marginBase: c.marginBase, cmKg: c.cmKg };
-        setS1Slots(newSlots); setS1Name("");
-      };
-
-      const loadS1 = (idx) => {
-        const slot = s1Slots[idx];
-        if(!slot) return;
-        setInp(p => ({ ...p, dealVolume: slot.dealVolume, powderRatio: slot.powderRatio, coContent: slot.coContent, niContent: slot.niContent, liContent: slot.liContent }));
-      };
-
-      const copyS1 = () => {
-        let text = "━━━━━━━━━━━━\n📊 Payable Rate 분석 결과\n━━━━━━━━━━━━\n\n";
-        text += `【 현재 시뮬레이션 중인 조건 】\n`;
-        text += `  • 물량/분말화: ${inp.dealVolume}톤 / ${inp.powderRatio}%\n`;
-        text += `  • 함량: Co ${inp.coContent}% | Ni ${inp.niContent}% | Li ${inp.liContent}%\n`;
-        text += `  • 지불률(CoNi): ${c.ratioCoNi.toFixed(1)}%\n`;
-        text += `  • 매입단가: ${f0(c.payable)} ₩/kg\n`;
-        text += `  • 총 지불액: ${fa(c.totalPayoutKRW)}\n`;
-        text += `  • 마진율: ${c.marginBase>0 ? (c.cmKg/c.marginBase*100).toFixed(1) : 0}% (${fa(c.totalMarginKRW)})\n\n`;
-
-        s1Slots.forEach((slot, i) => {
-          if (slot) {
-            text += `【 슬롯 ${i+1}: ${slot.name} 】\n`;
-            text += `  • 물량/분말화: ${slot.dealVolume}톤 / ${slot.powderRatio}%\n`;
-            text += `  • 함량: Co ${slot.coContent}% | Ni ${slot.niContent}% | Li ${slot.liContent}%\n`;
-            text += `  • 지불률(CoNi): ${slot.ratioCoNi.toFixed(1)}%\n`;
-            text += `  • 매입단가: ${f0(slot.payable)} ₩/kg\n`;
-            text += `  • 총 지불액: ${fa(slot.totalPayoutKRW)}\n`;
-            text += `  • 마진율: ${slot.marginBase>0 ? (slot.cmKg/slot.marginBase*100).toFixed(1) : 0}% (${fa(slot.totalMarginKRW)})\n\n`;
-          }
-        });
-        navigator.clipboard.writeText(text.trim()).then(() => alert("✅ 1시트 결과가 복사되었습니다."));
-      };
-
-      // ── 2시트 필수 변수 선언 (복구 완료) ──
-      const tgtNum = num(tgtVal);
-      const tgtPayable = tgtMode === "CoNi" ? c.coNiContained * (tgtNum / 100) : c.totContained * (tgtNum / 100);
-      const displayCoNi = tgtMode === "CoNi" ? tgtVal : (c.totContained > 0 && c.coNiContained > 0 ? (tgtNum * c.totContained / c.coNiContained).toFixed(1) : "");
-      const displayCoNiLi = tgtMode === "CoNiLi" ? tgtVal : (c.totContained > 0 && c.coNiContained > 0 ? (tgtNum * c.coNiContained / c.totContained).toFixed(1) : "");
-      
-      const numCoNi = num(displayCoNi);
-      const numCoNiLi = num(displayCoNiLi);
-
-      const allowedWet = c.totOut - tgtPayable - c.tgtMarginAmt - num(inp.preProcessCost) - num(inp.localLogistics) - num(inp.intlLogistics)*c.pr - num(inp.krLocalLogistics)*c.pr - num(inp.calcinationCost)*c.pr - num(inp.otherVarCost) + c.byproduct; 
-
-      return (
         <FxCtx.Provider value={{ openId:fxId, setOpenId:setFxId }}>
           <div onClick={() => setFxId(null)} style={{ fontFamily:"'Apple SD Gothic Neo',Arial,sans-serif", background:C.bg, minHeight:"100vh", color:C.text, paddingBottom: 50 }}>
 
+            {/* 헤더 */}
             <div style={{ padding:"14px 20px", background:C.headerBg, borderBottom:"1px solid #334155" }}>
-              <div style={{ fontSize:11, letterSpacing:"0.15em", color:"#94A3B8", textTransform:"uppercase" }}>원료 매입 단가 분석</div>
+              <div style={{ fontSize:11, letterSpacing:"0.15em", color:"#94A3B8" }}>원료 매입 단가 분석</div>
               <div style={{ fontSize:20, fontWeight:800, marginTop:2, color:C.headerText }}>Payable Rate 계산기</div>
               <div style={{ fontSize:12, color:"#94A3B8", marginTop:4 }}>비용 차감 기준 최대 허용 지급률(상한선) · 목표마진 반영</div>
             </div>
 
+            {/* 네비게이션 탭 */}
             <div style={{ display:"flex", background:"#FFFFFF", borderBottom:"2px solid "+C.border, overflowX:"auto" }}>
               {["1시트  Payable Rate 계산","2시트  목표 가공비 역산","3시트  스크랩 Payable","4시트  경쟁사 분석"].map((t,i) => (
                 <button key={i} onClick={() => setTab(i)}
@@ -780,13 +598,13 @@
                       <CRow label="기타 비용" value={"-"+f0(c.otherV)} unit="₩/kg" color="#DC2626" />
                       <CRow label="(+) 부산물" value={"+"+f0(c.byproduct)} unit="₩/kg" color={C.green} />
                       <CRow label="(-) 목표마진" value={"-"+f0(c.tgtMarginAmt)} unit="₩/kg" color={C.purple} />
-                      <CRow label="비용+마진 합계" value={"-"+f0(c.totVar+c.tgtMarginAmt-c.byproduct)} unit="₩/kg" bold color={C.red} />
+                      <CRow label="비용+마진 합계" value={"-"+f0(c.totVar+c.tgtMarginAmt-c.byproduct)} unit="₩/kg" bold color={C.red} sub="비용+마진-부산물" />
                     </div>
 
                     <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
                       <div style={{ background:C.card, borderRadius:10, overflow:"hidden", border:"1px solid "+C.border }}>
                         <Sec label="Payable Rate" color={C.amber} />
-                        <div style={{ margin:"6px 10px", padding:"12px", background:"#FFFBEB", border:"1px solid #D97706", borderRadius:8 }}>
+                        <div style={{ margin:"12px", padding:"12px", background:"#FFFBEB", border:"1px solid #D97706", borderRadius:8 }}>
                           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", paddingBottom:8, borderBottom:"1px solid #E2E8F0", marginBottom:8 }}>
                             <div>
                               <div style={{ fontSize:12, fontWeight:700, color:C.amber }}>Co+Ni 기준</div>
@@ -855,7 +673,7 @@
                             <span style={{ fontSize:14, fontWeight:700, color:"#FCD34D" }}>{fa(c.totalPayoutKRW)}</span>
                           </div>
                           <div style={{ display:"flex", justifyContent:"space-between", marginTop:4 }}>
-                            <span style={{ fontSize:12 }}>총 수익(마진)</span>
+                            <span style={{ fontSize:12 }}>총 확보 수익</span>
                             <span style={{ fontSize:14, fontWeight:700, color:"#4ADE80" }}>{fa(c.totalMarginKRW)}</span>
                           </div>
                         </div>
@@ -1017,7 +835,7 @@
                     </div>
                   </div>
 
-                  {/* ── 중국 지불률 환산 모듈 ── */}
+                  {/* ── 중국 지불률 환산 (2시트 하단 독립) ── */}
                   <div style={{ marginTop:14, background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
                     <div onClick={() => setChShow(!chShow)} style={{ padding:"12px 16px", background:"#EFF6FF", cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                       <span style={{ fontSize:14, fontWeight:700, color:C.blue }}>중국 지불률 -> CoNiLi Rate 환산 (클릭하여 펼치기)</span>
