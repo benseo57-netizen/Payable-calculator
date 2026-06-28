@@ -70,7 +70,7 @@
       secBg: "#F8FAFC"
     };
 
-    // ── 공통 UI 기초 컴포넌트 ──
+    // ── 공통 UI 컴포넌트 ──
     function Sec({ label, color }) {
       return (
         <div style={{ padding:"6px 12px", marginTop:8, fontSize:12, fontWeight:700,
@@ -129,7 +129,6 @@
       );
     }
 
-    // ── 화면 뻗음 방지 최후의 쉴드 ──
     class SafeErrorBoundary extends React.Component {
       constructor(props) { super(props); this.state = { hasError: false, error: null }; }
       static getDerivedStateFromError(error) { return { hasError: true, error }; }
@@ -147,9 +146,76 @@
       }
     }
 
-    // ── 오리지널 통짜 앱 (모든 시트와 변수를 최상단에서 통합 관리하여 오류 원천 차단) ──
+    // ── 공통 계산 엔진 ──
+    function compute(inp) {
+      const er  = num(inp.exchangeRate);
+      const coP = num(inp.coUSD) * 2.20462 * er;  
+      const niP = (num(inp.niUSD) / 1000) * er;
+      const liP = num(inp.liUSD) * er;
+      const pr  = num(inp.powderRatio) / 100;
+      const cor = num(inp.coRecovery) / 100;
+      const nir = num(inp.niRecovery) / 100;
+      const lir = num(inp.liRecovery) / 100;
+      const coC = num(inp.coContent) / 100;
+      const niC = num(inp.niContent) / 100;
+      const liC = num(inp.liContent) / 100;
+      
+      const coOut = coC * pr * cor;
+      const niOut = niC * pr * nir;
+      const liOut = liC * LI_CONV * pr * lir;
+      const coVal = coOut * coP;
+      const niVal = niOut * niP;
+      const liVal = liOut * liP;
+      const totOut  = coVal + niVal + liVal;
+
+      const coContained  = coC * pr * coP;
+      const niContained  = niC * pr * niP;
+      const liContained  = liC * LI_CONV * pr * liP;
+      const coNiContained  = coContained + niContained;
+      const totContained   = coContained + niContained + liContained;
+      
+      const coNiOut = coVal + niVal;
+      const wetTotal = coOut * num(inp.coWetCost) + niOut * num(inp.niWetCost) + liOut * num(inp.liWetCost);
+      const preV    = num(inp.preProcessCost);
+      const localV  = num(inp.localLogistics);
+      const intlV   = num(inp.intlLogistics);
+      const krV     = num(inp.krLocalLogistics);
+      const calcV   = num(inp.calcinationCost);
+      const otherV  = num(inp.otherVarCost);
+      const byproduct = num(inp.byproductRevenue);
+      const totVar      = preV + wetTotal + localV + intlV*pr + krV*pr + calcV*pr + otherV;
+      
+      const tgtMarginPct = num(inp.targetMargin) / 100;
+      const tgtMarginAmt = totOut * tgtMarginPct;           
+      const payable      = totOut - totVar + byproduct - tgtMarginAmt;
+      const marginBase   = totOut + tgtMarginAmt;           
+      
+      const ratioCoNi   = coNiContained > 0 ? (payable / coNiContained) * 100 : NaN;
+      const ratioCoNiLi = (coNiContained > 0 && totContained > 0) ? (ratioCoNi * (coNiContained / totContained)) : NaN;
+      
+      const mktCoNi     = num(inp.marketRatioCoNi);
+      const mktCoNiLi   = num(inp.marketRatioCoNiLi);
+      const marketPrice = coNiContained * (mktCoNi / 100);
+      const cmKg        = payable - marketPrice;
+      
+      const trueMarginAmt = totOut - totVar + byproduct - marketPrice;
+      const trueMarginPct = totOut > 0 ? (trueMarginAmt / totOut) * 100 : 0;
+      
+      const qtyKg = num(inp.dealVolume) * 1000;
+      const totalPayoutKRW = marketPrice * qtyKg;
+      const totalMarginKRW = trueMarginAmt * qtyKg;
+
+      return {
+        coP, niP, liP, pr, coOut, niOut, liOut, coVal, niVal, liVal, totOut, coNiOut,
+        coContained, niContained, liContained, coNiContained, totContained,
+        wetTotal, preV, localV, intlV, krV, calcV, otherV, byproduct, totVar,
+        payable, tgtMarginAmt, marginBase, ratioCoNi, ratioCoNiLi,
+        mktCoNi, mktCoNiLi, marketPrice, cmKg, trueMarginAmt, trueMarginPct, totalPayoutKRW, totalMarginKRW
+      };
+    }
+
+    // ── 오리지널 통짜 앱 (모든 변수를 최상단에서 통합 관리) ──
     function App() {
-      // 1. 모든 상태(State) 변수들을 제일 위쪽 안전 구역에 선언 (Hook 규칙 위반 방지)
       const [tab, setTab] = useState(0);
       const [fxId, setFxId] = useState(null);
       const [chShow, setChShow] = useState(false);
@@ -186,73 +252,10 @@
       });
 
       const s = k => v => setInp(p => ({ ...p, [k]: v }));
+      
+      // 1시트 연산
+      const c = compute(inp);
 
-      // 2. 기초 공통 연산 (1, 2, 3시트 전체에서 완벽히 공유됨)
-      const er  = num(inp.exchangeRate);
-      const coP = num(inp.coUSD) * 2.20462 * er;  
-      const niP = (num(inp.niUSD) / 1000) * er;
-      const liP = num(inp.liUSD) * er;
-      const pr  = num(inp.powderRatio) / 100;
-      const cor = num(inp.coRecovery) / 100;
-      const nir = num(inp.niRecovery) / 100;
-      const lir = num(inp.liRecovery) / 100;
-      const coC = num(inp.coContent) / 100;
-      const niC = num(inp.niContent) / 100;
-      const liC = num(inp.liContent) / 100;
-      
-      const coOut = coC * pr * cor;
-      const niOut = niC * pr * nir;
-      const liOut = liC * LI_CONV * pr * lir;
-      const coVal = coOut * coP;
-      const niVal = niOut * niP;
-      const liVal = liOut * liP;
-      const totOut  = coVal + niVal + liVal;
-
-      const coContained  = coC * pr * coP;
-      const niContained  = niC * pr * niP;
-      const liContained  = liC * LI_CONV * pr * liP;
-      const coNiContained  = coContained + niContained;
-      const totContained   = coContained + niContained + liContained;
-      
-      const wetTotal = coOut * num(inp.coWetCost) + niOut * num(inp.niWetCost) + liOut * num(inp.liWetCost);
-      const preV    = num(inp.preProcessCost);
-      const localV  = num(inp.localLogistics);
-      const intlV   = num(inp.intlLogistics);
-      const krV     = num(inp.krLocalLogistics);
-      const calcV   = num(inp.calcinationCost);
-      const otherV  = num(inp.otherVarCost);
-      const byproduct = num(inp.byproductRevenue);
-      const totVar      = preV + wetTotal + localV + intlV*pr + krV*pr + calcV*pr + otherV;
-      
-      const tgtMarginPct = num(inp.targetMargin) / 100;
-      const tgtMarginAmt = totOut * tgtMarginPct;           
-      const payable      = totOut - totVar + byproduct - tgtMarginAmt;
-      const marginBase   = totOut + tgtMarginAmt;           
-      
-      const ratioCoNi   = coNiContained > 0 ? (payable / coNiContained) * 100 : NaN;
-      const ratioCoNiLi = (coNiContained > 0 && totContained > 0) ? (ratioCoNi * (coNiContained / totContained)) : NaN;
-      
-      const mktCoNi     = num(inp.marketRatioCoNi);
-      const mktCoNiLi   = num(inp.marketRatioCoNiLi);
-      const marketPrice = coNiContained * (mktCoNi / 100);
-      const cmKg        = payable - marketPrice;
-      
-      const trueMarginAmt = totOut - totVar + byproduct - marketPrice;
-      const trueMarginPct = totOut > 0 ? (trueMarginAmt / totOut) * 100 : 0;
-      
-      const qtyKg = num(inp.dealVolume) * 1000;
-      const totalPayoutKRW = marketPrice * qtyKg;
-      const totalMarginKRW = trueMarginAmt * qtyKg;
-
-      const c = {
-        coP, niP, liP, pr, coOut, niOut, liOut, coVal, niVal, liVal, totOut,
-        coContained, niContained, liContained, coNiContained, totContained,
-        wetTotal, preV, localV, intlV, krV, calcV, otherV, byproduct, totVar,
-        payable, tgtMarginAmt, marginBase, ratioCoNi, ratioCoNiLi,
-        mktCoNi, mktCoNiLi, marketPrice, cmKg, trueMarginAmt, trueMarginPct, totalPayoutKRW, totalMarginKRW
-      };
-
-      // ── 1시트 핸들러 ──
       const saveS1 = (idx) => {
         if(!s1Name.trim()) { alert("저장할 이름을 입력해주세요."); return; }
         const newSlots = [...s1Slots];
@@ -297,17 +300,15 @@
         navigator.clipboard.writeText(text.trim()).then(() => alert("✅ 결과가 복사되었습니다."));
       };
 
-      // ── 2시트 독립 연산 ──
+      // 2시트 연산
       const tgtNum = num(tgtVal);
       const tgtPayable = tgtMode === "CoNi" ? c.coNiContained * (tgtNum / 100) : c.totContained * (tgtNum / 100);
       const displayCoNi = tgtMode === "CoNi" ? tgtVal : (c.totContained > 0 && c.coNiContained > 0 ? (tgtNum * c.totContained / c.coNiContained).toFixed(1) : "");
       const displayCoNiLi = tgtMode === "CoNiLi" ? tgtVal : (c.totContained > 0 && c.coNiContained > 0 ? (tgtNum * c.coNiContained / c.totContained).toFixed(1) : "");
-      const numCoNi = num(displayCoNi);
-      const numCoNiLi = num(displayCoNiLi);
       
       const allowedWet = c.totOut - tgtPayable - c.tgtMarginAmt - num(inp.preProcessCost) - num(inp.localLogistics) - num(inp.intlLogistics)*c.pr - num(inp.krLocalLogistics)*c.pr - num(inp.calcinationCost)*c.pr - num(inp.otherVarCost) + c.byproduct; 
 
-      // ── 2시트 중국 지불률 연산 ──
+      // 2시트 중국 지불률 연산
       const er2    = num(inp.exchangeRate);
       const niSO4P = num(inp.niSO4Price) / 1000 * er2;
       const coSO4P = num(inp.coSO4Price) / 1000 * er2;
@@ -322,7 +323,7 @@
       const chEquiv = c.totContained > 0 ? (totalCh / c.totContained * 100) : NaN;
       const hasInputCh = num(inp.niChPay)>0 || num(inp.coChPay)>0 || num(inp.liChPay)>0;
 
-      // ── 3시트 독립 연산 ──
+      // 3시트 연산
       const pool3 = c.coNiContained * (num(inp.s3TargetCoNi) / 100);
       const maxPay3 = c.totOut - c.totVar - c.tgtMarginAmt;
 
@@ -384,7 +385,7 @@
         navigator.clipboard.writeText(text.trim()).then(() => alert("✅ 3시트 결과가 복사되었습니다."));
       };
 
-      // ── 4시트 독립 연산 ──
+      // 4시트 연산
       const metalEr4 = num(inp.exchangeRate);
       const coP4 = num(inp.coUSD) * 2.20462 * metalEr4; const niP4 = num(inp.niUSD) / 1000 * metalEr4; const liP4 = num(inp.liUSD) * metalEr4;
       const pr4  = num(inp.s4PowderRatio) / 100;
@@ -977,7 +978,7 @@
                               </div>
 
                               <div style={{ padding:12, background:niNeg3?"#FEF2F2":"#ECFDF5", textAlign:"center", marginTop:10 }}>
-                                <div style={{ fontSize:12, fontWeight:700, color:niNeg3?C.red:C.green }}>최종 계약서 기재용 확정 수치 요약</div>
+                                <div style={{ fontSize:12, fontWeight:700, color:niNeg3?C.red:C.green }}>최종 도출 지불률 조합</div>
                                 <div style={{ fontSize:20, fontWeight:800, color:niNeg3?C.red:C.purple, marginTop:6 }}>
                                   {niNeg3 ? "⚠ 역산 불가 (배분 한도 초과)" : `Co ${f1(finalCoPay3)}% / Ni ${f1(finalNiPay3)}% / Li ${f1(finalLiPay3)}%`}
                                 </div>
