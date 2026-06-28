@@ -60,7 +60,7 @@
     const f0 = n => (n == null || isNaN(n) || !isFinite(n)) ? "—" : Math.round(n).toLocaleString("ko-KR");
     const f1 = n => (n == null || isNaN(n) || !isFinite(n)) ? "—" : n.toFixed(1);
     const fp = (n, d=0) => (n == null || isNaN(n) || !isFinite(n)) ? "—" : n.toFixed(d) + "%";
-    const fa = n => (n == null || isNaN(n) || !isFinite(n)) ? "—" : (n / 1e8).toFixed(2) + "억";
+    const fa = n => (n == null || isNaN(n) || !isFinite(n)) ? "—" : (n / 1e8).toFixed(2) + "억 원";
     const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
 
     const C = {
@@ -216,6 +216,7 @@
 
     // ── 오리지널 통짜 App (모든 시트를 여기서 관장) ──
     function App() {
+      // 컴포넌트 최상단: 절대 뻗지 않는 상태 변수 선언 구역
       const [tab, setTab] = useState(0);
       const [fxId, setFxId] = useState(null);
       const [chShow, setChShow] = useState(false);
@@ -229,6 +230,7 @@
       const [s3Name, setS3Name] = useState("");
       const [s3AutoTarget, setS3AutoTarget] = useState("ni");
 
+      // 오류의 핵심 원인이었던 4시트 상태값을 가장 안전한 최상단으로 옮겼습니다.
       const [comps, setComps] = useState([
         { name:"", er:"1340", pct:"80" }, { name:"", er:"1340", pct:"45" }, { name:"", er:"1340", pct:"51" }
       ]);
@@ -252,6 +254,7 @@
 
       const s = k => v => setInp(p => ({ ...p, [k]: v }));
       
+      // ── 1, 2시트 공통 연산 ──
       const c = compute(inp);
 
       const saveS1 = (idx) => {
@@ -298,6 +301,14 @@
         navigator.clipboard.writeText(text.trim()).then(() => alert("✅ 결과가 복사되었습니다."));
       };
 
+      // ── 2시트 연산 ──
+      const tgtNum = num(tgtVal);
+      const tgtPayable = tgtMode === "CoNi" ? c.coNiContained * (tgtNum / 100) : c.totContained * (tgtNum / 100);
+      const displayCoNi = tgtMode === "CoNi" ? tgtVal : (c.totContained > 0 && c.coNiContained > 0 ? (tgtNum * c.totContained / c.coNiContained).toFixed(1) : "");
+      const displayCoNiLi = tgtMode === "CoNiLi" ? tgtVal : (c.totContained > 0 && c.coNiContained > 0 ? (tgtNum * c.coNiContained / c.totContained).toFixed(1) : "");
+      
+      const allowedWet = c.totOut - tgtPayable - c.tgtMarginAmt - num(inp.preProcessCost) - num(inp.localLogistics) - num(inp.intlLogistics)*c.pr - num(inp.krLocalLogistics)*c.pr - num(inp.calcinationCost)*c.pr - num(inp.otherVarCost) + c.byproduct; 
+
       return (
         <FxCtx.Provider value={{ openId:fxId, setOpenId:setFxId }}>
           <div onClick={() => setFxId(null)} style={{ fontFamily:"'Apple SD Gothic Neo',Arial,sans-serif", background:C.bg, minHeight:"100vh", color:C.text, paddingBottom: 50 }}>
@@ -343,7 +354,7 @@
                       <IRow label="분말화비율" value={inp.powderRatio} onChange={s("powderRatio")} unit="%" />
                       <IRow label="Co 함량" value={inp.coContent} onChange={s("coContent")} unit="%" />
                       <IRow label="Ni 함량" value={inp.niContent} onChange={s("niContent")} unit="%" />
-                      <IRow label="Li 함량" value={inp.liContent} onChange={s("liContent")} unit="%" note="Li 금속 기준 (18.8% 환산)" />
+                      <IRow label="Li 함량" value={inp.liContent} onChange={s("liContent")} unit="%" note="Li 금속 기준 (18.8% 환산 자동)" />
 
                       <Sec label="4. 습식 회수율" color={C.blue} />
                       <IRow label="Co 회수율" value={inp.coRecovery} onChange={s("coRecovery")} unit="%" />
@@ -359,16 +370,16 @@
                       <Sec label="6. 물류·소성·기타 비용" color={C.red} />
                       <IRow label="전처리 가공비" value={inp.preProcessCost} onChange={s("preProcessCost")} unit="₩/kg" />
                       <IRow label="로컬 물류비" value={inp.localLogistics} onChange={s("localLogistics")} unit="₩/kg" note="₩/kg-스크랩" />
-                      <IRow label="국제 운임" value={inp.intlLogistics} onChange={s("intlLogistics")} unit="₩/kg-BM" note="₩/kg-BM" />
-                      <IRow label="한국 로컬" value={inp.krLocalLogistics} onChange={s("krLocalLogistics")} unit="₩/kg-BM" note="₩/kg-BM" />
-                      <IRow label="소성비용" value={inp.calcinationCost} onChange={s("calcinationCost")} unit="₩/kg-BM" note="₩/kg-BM" />
+                      <IRow label="국제 운임" value={inp.intlLogistics} onChange={s("intlLogistics")} unit="₩/kg-BM" note="₩/kg-BM · 불필요시 0" />
+                      <IRow label="한국 로컬" value={inp.krLocalLogistics} onChange={s("krLocalLogistics")} unit="₩/kg-BM" note="₩/kg-BM · 불필요시 0" />
+                      <IRow label="소성비용" value={inp.calcinationCost} onChange={s("calcinationCost")} unit="₩/kg-BM" note="₩/kg-BM · 불필요시 0" />
                       <IRow label="기타 비용" value={inp.otherVarCost} onChange={s("otherVarCost")} unit="₩/kg" />
                     </div>
 
                     <div style={{ background:C.card, borderRadius:10, overflow:"hidden", border:"1px solid "+C.border }}>
                       <Sec label="원재료 내 함량가치" color="#60A5FA" />
-                      <CRow label="Co 함량가치" value={f0(c.coContained)} unit="₩/kg" color="#93C5FD" sub={"Co "+inp.coContent+"% x 분말화 (회수율 미적용)"} />
-                      <CRow label="Ni 함량가치" value={f0(c.niContained)} unit="₩/kg" color="#93C5FD" sub={"Ni "+inp.niContent+"% x 분말화 (회수율 미적용)"} />
+                      <CRow label="Co 함량가치" value={f0(c.coContained)} unit="₩/kg" color="#93C5FD" sub={"Co "+inp.coContent+"% x 분말화 "+inp.powderRatio+"% (회수율 미적용)"} />
+                      <CRow label="Ni 함량가치" value={f0(c.niContained)} unit="₩/kg" color="#93C5FD" sub={"Ni "+inp.niContent+"% x 분말화 "+inp.powderRatio+"% (회수율 미적용)"} />
                       <CRow label="Li₂CO₃ 함량가치" value={f0(c.liContained)} unit="₩/kg" color="#93C5FD" sub={"Li "+inp.liContent+"% (18.8% 환산, 회수율 미적용)"} />
                       <CRow label="Co+Ni 함량가치" value={f0(c.coNiContained)} unit="₩/kg" bold color="#1D4ED8" sub="Payable Rate 분모 (CoNi 기준)" />
                       <CRow label="전체 함량가치" value={f0(c.totContained)} unit="₩/kg" bold color="#065F46" sub="Payable Rate 분모 (CoNiLi 기준)" />
@@ -380,12 +391,21 @@
                       <CRow label="Output 합계" value={f0(c.totOut)} unit="₩/kg" bold />
 
                       <Sec label="7. 부산물 판매수익" color={C.green} />
-                      <IRow label="부산물 판매수익" value={inp.byproductRevenue} onChange={s("byproductRevenue")} unit="₩/kg" accent note="스크랩 kg당 부산물 판매수익" />
+                      <IRow label="부산물 판매수익" value={inp.byproductRevenue} onChange={s("byproductRevenue")} unit="₩/kg" accent note="스크랩 kg당 부산물 판매수익 · Payable 상한선 증가" />
 
                       <Sec label="8. 목표 마진" color={C.purple} />
                       <IRow label="목표 마진율" value={inp.targetMargin} onChange={s("targetMargin")} unit="%" highlight note={"Output의 "+inp.targetMargin+"% = "+f0(c.tgtMarginAmt)+"₩/kg"} />
 
                       <Sec label="비용 합계" color={C.red} />
+                      <CRow label="전처리 가공비" value={"-"+f0(c.preV)} unit="₩/kg" color="#DC2626" />
+                      <CRow label="습식가공비" value={"-"+f0(c.wetTotal)} unit="₩/kg" color="#DC2626" />
+                      <CRow label="로컬 물류비" value={"-"+f0(c.localV)} unit="₩/kg" color="#DC2626" />
+                      <CRow label="국제 운임" value={"-"+f0(c.intlV*c.pr)} unit="₩/kg" color="#DC2626" />
+                      <CRow label="한국 로컬" value={"-"+f0(c.krV*c.pr)} unit="₩/kg" color="#DC2626" />
+                      <CRow label="소성비용" value={"-"+f0(c.calcV*c.pr)} unit="₩/kg" color="#DC2626" />
+                      <CRow label="기타 비용" value={"-"+f0(c.otherV)} unit="₩/kg" color="#DC2626" />
+                      <CRow label="(+) 부산물" value={"+"+f0(c.byproduct)} unit="₩/kg" color={C.green} />
+                      <CRow label="(-) 목표마진" value={"-"+f0(c.tgtMarginAmt)} unit="₩/kg" color={C.purple} />
                       <CRow label="비용+마진 합계" value={"-"+f0(c.totVar+c.tgtMarginAmt-c.byproduct)} unit="₩/kg" bold color={C.red} sub="비용+마진-부산물" />
                     </div>
 
@@ -442,12 +462,12 @@
                         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginTop:12 }}>
                           <div style={{ background:"#F0FDF4", padding:10, borderRadius:8, border:"1px solid #A7F3D0", textAlign:"center" }}>
                             <div style={{ fontSize:11, color:C.muted, marginBottom:4 }}>kg당 마진</div>
-                            <div style={{ fontSize:22, fontWeight:800, color:c.trueMarginAmt>=0?C.green:C.red }}>{f0(c.trueMarginAmt)}</div>
+                            <div style={{ fontSize:22, fontWeight:800, color:c.cmKg>=0?C.green:C.red }}>{f0(c.cmKg)}</div>
                             <div style={{ fontSize:11, color:C.dim }}>₩/kg</div>
                           </div>
                           <div style={{ background:"#F0FDF4", padding:10, borderRadius:8, border:"1px solid #A7F3D0", textAlign:"center" }}>
                             <div style={{ fontSize:11, color:C.muted, marginBottom:4 }}>마진율</div>
-                            <div style={{ fontSize:22, fontWeight:800, color:c.trueMarginAmt>=0?C.green:C.red }}>
+                            <div style={{ fontSize:22, fontWeight:800, color:c.cmKg>=0?C.green:C.red }}>
                               {c.marginBase>0 ? fp(c.cmKg*100/c.marginBase, 1) : "--"}
                             </div>
                             <div style={{ fontSize:11, color:C.dim }}>% (Output+마진 기준)</div>
@@ -479,7 +499,7 @@
 
                   <div style={{ marginTop:20, background:C.card, padding:16, borderRadius:10, border:"1px solid "+C.border }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12, borderBottom:"2px solid "+C.border, paddingBottom:6 }}>
-                      <div style={{ fontSize:15, fontWeight:800, color:C.navy }}>📥 시뮬레이션 보관함 리스트</div>
+                      <div style={{ fontSize:14, fontWeight:800, color:C.navy }}>시뮬레이션 보관함 리스트</div>
                       <button onClick={copyS1} style={{ padding:"6px 12px", fontSize:12, fontWeight:700, background:"#1E293B", color:"#FFF", border:"none", borderRadius:4, cursor:"pointer" }}>📋 결과 복사 (전체 요약)</button>
                     </div>
                     <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(200px, 1fr))", gap:10 }}>
@@ -490,7 +510,7 @@
                             <div style={{ fontSize:12, lineHeight:1.6 }}>
                               <div>• 물량: {slot.dealVolume}톤 ({slot.powderRatio}%)</div>
                               <div>• 함량: Co{slot.coContent}% Ni{slot.niContent}% Li{slot.liContent}%</div>
-                              <div>• Rate: <span style={{color:C.amber, fontWeight:700}}>{slot.ratioCoNi.toFixed(1)}%</span></div>
+                              <div>• 지불률: <span style={{color:C.amber, fontWeight:700}}>{slot.ratioCoNi.toFixed(1)}%</span></div>
                               <div>• 마진율: <span style={{color:C.green, fontWeight:700}}>{slot.marginBase>0 ? (slot.cmKg/slot.marginBase*100).toFixed(1) : 0}%</span></div>
                               <div style={{ fontWeight:800, color:C.text, marginTop:6 }}>단가: {f0(slot.payable)}원</div>
                               <button onClick={() => loadS1(idx)} style={{ width:"100%", marginTop:10, padding:"6px 0", fontSize:12, fontWeight:700, background:"#EFF6FF", color:C.blue, border:"1px solid #BFDBFE", borderRadius:4, cursor:"pointer" }}>🔄 불러오기</button>
@@ -623,7 +643,7 @@
                     </div>
                   </div>
 
-                  {/* ── 중국 지불률 환산 (2시트 하단 독립) ── */}
+                  {/* ── 중국 지불률 환산 모듈 ── */}
                   <div style={{ marginTop:14, background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
                     <div onClick={() => setChShow(!chShow)} style={{ padding:"12px 16px", background:"#EFF6FF", cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                       <span style={{ fontSize:14, fontWeight:700, color:C.blue }}>중국 지불률 -> CoNiLi Rate 환산 (클릭하여 펼치기)</span>
@@ -775,9 +795,9 @@
                           <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
                             <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
                               <Sec label="① 원료 조건 — 1시트 연동" color={C.blue} />
-                              <CRow label="Co 환산가" value={f0(c.coP)} unit="₩/kg" color={C.amber} />
-                              <CRow label="Ni 환산가" value={f0(c.niP)} unit="₩/kg" color={C.blue} />
-                              <CRow label="Li₂CO₃ 환산가" value={f0(c.liP)} unit="₩/kg" color={C.green} />
+                              <CRow label="Co 환산가" value={f0(c.coP)} unit="₩/kg" color={C.amber} sub={"Co "+inp.coUSD+"$/lb × 2.20462 × "+inp.exchangeRate} />
+                              <CRow label="Ni 환산가" value={f0(c.niP)} unit="₩/kg" color={C.blue} sub={"Ni "+inp.niUSD+"$/ton ÷ 1,000 × "+inp.exchangeRate} />
+                              <CRow label="Li₂CO₃ 환산가" value={f0(c.liP)} unit="₩/kg" color={C.green} sub={"Li₂CO₃ "+inp.liUSD+"$/kg × "+inp.exchangeRate} />
                               <CRow label="분말화비율" value={inp.powderRatio+"%"} unit="" />
                               <CRow label="Co / Ni / Li 함량" value={inp.coContent+"% / "+inp.niContent+"% / "+inp.liContent+"%"} unit="" />
                               <CRow label="Co / Ni / Li 회수율" value={inp.coRecovery+"% / "+inp.niRecovery+"% / "+inp.liRecovery+"%"} unit="" />
@@ -828,8 +848,8 @@
                               </div>
 
                               <div style={{ padding:10, borderTop:"1px dashed "+C.border }}>
-                                <div style={{ fontSize:11, fontWeight:700, marginBottom:4 }}>💾 시나리오 저장</div>
-                                <input value={s3Name} onChange={e=>setS3Name(e.target.value)} placeholder="이름 (예: A사 제안안)" style={{width:"100%", padding:6, fontSize:12, border:"1px solid "+C.border, borderRadius:4, marginBottom:6, outline:"none"}}/>
+                                <div style={{ fontSize:11, fontWeight:700, marginBottom:4 }}>💾 시나리오 보관함 저장</div>
+                                <input value={s3Name} onChange={e=>setS3Name(e.target.value)} placeholder="시나리오명 입력" style={{width:"100%", padding:6, fontSize:12, border:"1px solid "+C.border, borderRadius:4, marginBottom:6, outline:"none"}}/>
                                 <div style={{ display:"grid", gridTemplateColumns:"repeat(5, 1fr)", gap:4 }}>
                                   {[0,1,2,3,4].map(idx => <button key={idx} onClick={() => saveS3(idx)} style={{ padding:"6px 0", fontSize:11, fontWeight:700, cursor:"pointer", background:s3Slots[idx]?"#D1FAE5":"#E2E8F0", border:"1px solid "+(s3Slots[idx]?"#10B981":C.border), color:s3Slots[idx]?C.green:C.text, borderRadius:4 }}>S{idx+1}</button>)}
                                 </div>
@@ -882,8 +902,8 @@
 
                         <div style={{ marginTop:14, background:C.card, padding:16, borderRadius:10, border:"1px solid "+C.border }}>
                           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12, borderBottom:"2px solid "+C.border, paddingBottom:6 }}>
-                            <div style={{ fontSize:14, fontWeight:800, color:C.navy }}>📥 시뮬레이션 보관함 리스트</div>
-                            <button onClick={copyS3} style={{ padding:"6px 14px", fontSize:12, fontWeight:700, background:"#1E293B", color:"#FFF", border:"none", borderRadius:4, cursor:"pointer" }}>📋 결과 복사 (전체 요약)</button>
+                            <div style={{ fontSize:14, fontWeight:800, color:C.navy }}>📥 3시트 배분 시나리오 리스트</div>
+                            <button onClick={copyS3} style={{ padding:"6px 14px", fontSize:12, fontWeight:700, background:C.blue, color:"#FFF", border:"none", borderRadius:4, cursor:"pointer" }}>📋 결과 복사 (전체 요약)</button>
                           </div>
                           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))", gap:10 }}>
                             {s3Slots.map((slot, idx) => (
@@ -903,6 +923,7 @@
                       </div>
                     );
                   })()}
+                </div>
                 </SafeErrorBoundary>
               )}
 
@@ -927,8 +948,8 @@
                     const ourWetUSD4 = coOut4*coWU4 + niOut4*niWU4 + liOut4*liWU4;
                     const ourWetKRW4 = coOut4*coWU4*ourEr4 + niOut4*niWU4*ourEr4 + liOut4*liWU4*ourEr4;
                     const ourMax4    = totOut4 - ourWetKRW4;
-                    const ourCoNi4   = coNiCont4>0 ? Math.round(ourMax4/coNiCont4*100) : NaN;
-                    const ourCnli4   = totCont4>0 ? Math.round(ourMax4/totCont4*100) : NaN;
+                    const ourCoNi4   = coNiCont4>0 ? (ourMax4/coNiCont4)*100 : NaN;
+                    const ourCnli4   = totCont4>0 ? (ourMax4/totCont4)*100 : NaN;
 
                     const updateComp = (i,field,val) => setComps(prev => prev.map((c,idx) => idx===i ? {...c,[field]:val} : c));
                     const addComp    = () => setComps(prev => [...prev,{name:"",er:"1449",pct:"100"}]);
@@ -982,7 +1003,7 @@
                             const compEr = num(comp.er); const pctN = num(comp.pct)/100;
                             const cpWetKRW = coOut4*(coWU4*pctN)*compEr + niOut4*(niWU4*pctN)*compEr + liOut4*(liWU4*pctN)*compEr;
                             const cpMax = totOut4 - cpWetKRW;
-                            const cpCoNi = coNiCont4>0 ? Math.round(cpMax/coNiCont4*100) : NaN;
+                            const cpCoNi = coNiCont4>0 ? (cpMax/coNiCont4)*100 : NaN;
                             return (
                               <div key={i} style={{ display:"grid", gridTemplateColumns:"minmax(120px, 1fr) 100px 100px 100px 100px 50px", gap:10, padding:10, borderBottom:"1px solid "+C.border, alignItems:"center", background:i%2===0?"#FFF":C.secBg }}>
                                 <input value={comp.name} onChange={e=>updateComp(i,"name",e.target.value)} placeholder={`경쟁사 ${i+1}`} style={{padding:6, border:"1px solid "+C.border, borderRadius:4, outline:"none"}}/>
