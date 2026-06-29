@@ -32,6 +32,31 @@
         grid-template-columns: 1fr !important;
       }
     }
+
+    /* 4시트 — 경쟁사 비교 행 (데스크탑: 한 줄 6열 / 모바일: 2열로 줄바꿈) */
+    .comp-row {
+      display: grid;
+      grid-template-columns: minmax(120px, 1fr) 100px 100px 100px 100px 50px;
+      gap: 10px;
+      align-items: center;
+    }
+    @media (max-width: 600px) {
+      .comp-row {
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas:
+          "name del"
+          "er pct"
+          "wet rate";
+        row-gap: 8px;
+        column-gap: 8px;
+      }
+      .comp-name { grid-area: name; min-width: 0; }
+      .comp-er   { grid-area: er; min-width: 0; }
+      .comp-pct  { grid-area: pct; min-width: 0; }
+      .comp-wet  { grid-area: wet; }
+      .comp-rate { grid-area: rate; }
+      .comp-del  { grid-area: del; justify-self: end; }
+    }
   </style>
 
   <script>
@@ -66,7 +91,7 @@
     const C = {
       bg: "#F0F4F8", card: "#FFFFFF", border: "#CBD5E1", amber: "#B45309", blue: "#1D4ED8",
       green: "#065F46", red: "#B91C1C", purple: "#6D28D9", navy: "#0F172A", text: "#0F172A",
-      muted: "#475569", dim: "#94A3B8", headerBg: "#0F172A", headerText: "#F8FAFC",
+      muted: "#475569", dim: "#94A3B8", vdim: "#CBD5E1", headerBg: "#0F172A", headerText: "#F8FAFC",
       secBg: "#F8FAFC"
     };
 
@@ -199,7 +224,9 @@
       
       const mktCoNi     = num(inp.marketRatioCoNi);
       const mktCoNiLi   = num(inp.marketRatioCoNiLi);
-      const marketPrice = coNiContained * (mktCoNi / 100);
+      const marketPrice = (inp.mktMode === "CoNiLi")
+        ? totContained * (mktCoNiLi / 100)
+        : coNiContained * (mktCoNi / 100);
       const cmKg        = payable - marketPrice;
       
       const trueMarginAmt = totOut - totVar + byproduct - marketPrice;
@@ -614,7 +641,7 @@
 
           <div style={{ marginTop:14, background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
             <div onClick={() => setChShow(!chShow)} style={{ padding:"12px 16px", background:"#EFF6FF", cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <span style={{ fontSize:14, fontWeight:700, color:C.blue }}>중국 지불률 -> CoNiLi Rate 환산 (클릭하여 펼치기)</span>
+              <span style={{ fontSize:14, fontWeight:700, color:C.blue }}>중국 지불률 → CoNiLi Rate 환산 (클릭하여 펼치기)</span>
               <span style={{ fontWeight:800 }}>{chShow ? "▲" : "▼"}</span>
             </div>
             {chShow && <ChCalcBlock inp={inp} c={c} s={s} />}
@@ -885,7 +912,7 @@
             </div>
           </div>
           
-          <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden", overflowX:"auto" }}>
+          <div style={{ background:C.card, borderRadius:10, border:"1px solid "+C.border, overflow:"hidden" }}>
             <div style={{ padding:"10px 14px", background:"#1E293B", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
               <div style={{ fontSize:13, fontWeight:700, color:"#F8FAFC" }}>⑤ 경쟁사 Payable Rate 역산</div>
               <button onClick={addComp} style={{ padding:"6px 14px", background:"#1D4ED8", color:"#fff", border:"none", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer" }}>+ 경쟁사 추가</button>
@@ -896,13 +923,25 @@
               const cpMax = totOut4 - cpWetKRW;
               const cpCoNi = coNiCont4>0 ? (cpMax/coNiCont4)*100 : NaN;
               return (
-                <div key={i} style={{ display:"grid", gridTemplateColumns:"minmax(120px, 1fr) 100px 100px 100px 100px 50px", gap:10, padding:10, borderBottom:"1px solid "+C.border, alignItems:"center", background:i%2===0?"#FFF":C.secBg }}>
-                  <input value={comp.name} onChange={e=>updateComp(i,"name",e.target.value)} placeholder={`경쟁사 ${i+1}`} style={{padding:6, border:"1px solid "+C.border, borderRadius:4, outline:"none"}}/>
-                  <input type="number" value={comp.er} onChange={e=>updateComp(i,"er",e.target.value)} placeholder="환율" style={{padding:6, border:"1px solid "+C.border, borderRadius:4, outline:"none"}}/>
-                  <div style={{display:"flex", alignItems:"center"}}><input type="number" value={comp.pct} onChange={e=>updateComp(i,"pct",e.target.value)} style={{width:"100%", padding:6, border:"1.5px solid "+C.amber, borderRadius:4, outline:"none"}}/><span style={{marginLeft:4, fontSize:12}}>%</span></div>
-                  <div style={{fontSize:12, fontWeight:700, color:cpWetKRW<ourWetKRW4?C.green:C.red}}>{f0(cpWetKRW)}₩</div>
-                  <div><span style={{fontSize:16, fontWeight:800, color:(cpCoNi-ourCoNi4)>0?C.red:C.green}}>{fp(cpCoNi)}</span></div>
-                  <button onClick={()=>removeComp(i)} style={{background:"transparent", border:"none", color:C.dim, cursor:"pointer", fontSize:16}}>✕</button>
+                <div key={i} className="comp-row" style={{ padding:10, borderBottom:"1px solid "+C.border, background:i%2===0?"#FFF":C.secBg }}>
+                  <input className="comp-name" value={comp.name} onChange={e=>updateComp(i,"name",e.target.value)} placeholder={`경쟁사 ${i+1}`} style={{padding:6, border:"1px solid "+C.border, borderRadius:4, outline:"none", width:"100%"}}/>
+                  <div className="comp-er">
+                    <div style={{fontSize:10, color:C.dim, marginBottom:2}}>환율</div>
+                    <input type="number" value={comp.er} onChange={e=>updateComp(i,"er",e.target.value)} placeholder="환율" style={{padding:6, border:"1px solid "+C.border, borderRadius:4, outline:"none", width:"100%"}}/>
+                  </div>
+                  <div className="comp-pct">
+                    <div style={{fontSize:10, color:C.dim, marginBottom:2}}>가공비 비율</div>
+                    <div style={{display:"flex", alignItems:"center"}}><input type="number" value={comp.pct} onChange={e=>updateComp(i,"pct",e.target.value)} style={{width:"100%", padding:6, border:"1.5px solid "+C.amber, borderRadius:4, outline:"none"}}/><span style={{marginLeft:4, fontSize:12, flexShrink:0}}>%</span></div>
+                  </div>
+                  <div className="comp-wet">
+                    <div style={{fontSize:10, color:C.dim, marginBottom:2}}>가공비</div>
+                    <div style={{fontSize:12, fontWeight:700, color:cpWetKRW<ourWetKRW4?C.green:C.red}}>{f0(cpWetKRW)}₩</div>
+                  </div>
+                  <div className="comp-rate">
+                    <div style={{fontSize:10, color:C.dim, marginBottom:2}}>CoNi Rate</div>
+                    <span style={{fontSize:16, fontWeight:800, color:(cpCoNi-ourCoNi4)>0?C.red:C.green}}>{fp(cpCoNi)}</span>
+                  </div>
+                  <button className="comp-del" onClick={()=>removeComp(i)} style={{background:"transparent", border:"none", color:C.dim, cursor:"pointer", fontSize:18, padding:"0 4px"}}>✕</button>
                 </div>
               );
             })}
@@ -911,12 +950,171 @@
       );
     }
 
+
+    // ── 최상위 App: 전체 상태 관리 + 4개 시트 탭 전환 ──
+    function App() {
+      const [fxId, setFxId] = useState(null);
+      const [tab, setTab]   = useState(0);
+
+      const [inp, setInp] = useState({
+        // 환율·시세·원료·회수율·가공비 (1시트, 3시트, 4시트 공용)
+        exchangeRate: "1449.32",
+        coUSD: "25.52", niUSD: "17133", liUSD: "18.72",
+        powderRatio: "100",
+        coContent: "2.57", niContent: "29.39", liContent: "4.16",
+        coRecovery: "95", niRecovery: "90", liRecovery: "90",
+        coWetCost: "13300", niWetCost: "11700", liWetCost: "9450",
+        preProcessCost: "0", localLogistics: "22",
+        intlLogistics: "0", krLocalLogistics: "0",
+        calcinationCost: "0", otherVarCost: "0",
+        byproductRevenue: "0",
+        targetMargin: "0",
+        dealVolume: "1350",
+        marketRatioCoNi: "88", marketRatioCoNiLi: "70",
+        mktMode: "CoNi",
+
+        // 2시트 하단 — 중국 지불률 환산 모듈
+        niSO4Price: "", coSO4Price: "", liCO3Price: "",
+        chNiContent: "", chCoContent: "", chLiContent: "",
+        niChPay: "", coChPay: "", liChPay: "",
+
+        // 3시트 — 메탈별 지불률 시뮬레이션
+        s3TargetCoNi: "88", s3CoPay: "0", s3NiPay: "0", s3LiPay: "0",
+
+        // 4시트 — 경쟁사 비교
+        s4PowderRatio: "100", s4CoContent: "2.57", s4NiContent: "29.39", s4LiContent: "4.16",
+        s4CoRecovery: "95", s4NiRecovery: "90", s4LiRecovery: "90",
+        s4OurEr: "1449.32", s4CoWetUSD: "0", s4NiWetUSD: "0", s4LiWetUSD: "0",
+      });
+
+      const s = k => v => setInp(p => ({ ...p, [k]: v }));
+      const c = compute(inp);
+
+      // ── 1시트: 시뮬레이션 슬롯 5개 ──
+      const [s1Slots, setS1Slots] = useState([null, null, null, null, null]);
+      const [s1Name, setS1Name]   = useState("");
+
+      const saveS1 = (idx) => {
+        if (!s1Name.trim()) { alert("저장할 이름을 입력해주세요."); return; }
+        const n = [...s1Slots];
+        n[idx] = {
+          name: s1Name,
+          dealVolume: inp.dealVolume, powderRatio: inp.powderRatio,
+          coContent: inp.coContent, niContent: inp.niContent, liContent: inp.liContent,
+          ratioCoNi: c.ratioCoNi, marginBase: c.marginBase, cmKg: c.cmKg, payable: c.payable,
+        };
+        setS1Slots(n); setS1Name("");
+      };
+
+      const loadS1 = (idx) => {
+        const slot = s1Slots[idx];
+        if (!slot) return;
+        setInp(p => ({ ...p,
+          dealVolume: slot.dealVolume, powderRatio: slot.powderRatio,
+          coContent: slot.coContent, niContent: slot.niContent, liContent: slot.liContent,
+        }));
+      };
+
+      const copyS1 = () => {
+        const now = new Date().toLocaleDateString("ko-KR");
+        const text = [
+          "━━━━━━━━━━━━━━━━━━━━━━━",
+          "📊 Payable Rate 분석 결과 (1시트)",
+          "━━━━━━━━━━━━━━━━━━━━━━━",
+          "",
+          `계약 물량: ${inp.dealVolume} ton`,
+          `Co+Ni 기준 Rate: ${fp(c.ratioCoNi)}`,
+          `Co+Ni+Li 기준 Rate: ${fp(c.ratioCoNiLi)}`,
+          `최대 매입단가: ${f0(c.payable)} ₩/kg`,
+          "",
+          `kg당 마진: ${f0(c.cmKg)} ₩/kg`,
+          `마진율: ${c.marginBase>0 ? (c.cmKg*100/c.marginBase).toFixed(1) : "—"}%`,
+          `총 매입대금: ${fa(c.totalPayoutKRW)}`,
+          `총 마진: ${fa(c.totalMarginKRW)}`,
+          "",
+          `※ ${now} 기준`,
+          "━━━━━━━━━━━━━━━━━━━━━━━",
+        ].join("\n");
+        navigator.clipboard.writeText(text).then(() => alert("✅ 클립보드에 복사되었습니다."));
+      };
+
+      // ── 2시트: 목표 Rate 입력 모드 ──
+      const [tgtMode, setTgtMode] = useState("CoNi");
+      const [tgtVal, setTgtVal]   = useState("90");
+      const [chShow, setChShow]   = useState(false);
+
+      // ── 3시트: 시나리오 슬롯 5개 ──
+      const [s3Slots, setS3Slots] = useState([null, null, null, null, null]);
+      const [s3Name, setS3Name]   = useState("");
+      const [s3AutoTarget, setS3AutoTarget] = useState("ni");
+
+      // ── 4시트: 경쟁사 비교 행 ──
+      const [comps, setComps] = useState([]);
+
+      const TABS = [
+        "1시트 · Payable Rate 계산",
+        "2시트 · 목표 가공비 역산",
+        "3시트 · 메탈별 지불률 시뮬레이션",
+        "4시트 · 경쟁사 비교",
+      ];
+
+      return (
+        <FxCtx.Provider value={{ openId: fxId, setOpenId: setFxId }}>
+          <div onClick={() => setFxId(null)}
+            style={{ fontFamily:"'Apple SD Gothic Neo',Arial,sans-serif",
+              background:C.bg, minHeight:"100vh", color:C.text }}>
+
+            <div style={{ padding:"14px 20px", background:C.headerBg, borderBottom:"1px solid #334155" }}>
+              <div style={{ fontSize:11, letterSpacing:"0.15em", color:"#94A3B8", textTransform:"uppercase" }}>원료 매입 단가 분석</div>
+              <div style={{ fontSize:20, fontWeight:800, marginTop:2, color:C.headerText }}>CM 기반 Payable Rate 계산기</div>
+            </div>
+
+            <div style={{ display:"flex", background:"#FFFFFF", borderBottom:"2px solid "+C.border, overflowX:"auto" }}>
+              {TABS.map((t,i) => (
+                <button key={i} onClick={() => setTab(i)}
+                  style={{ padding:"11px 18px", fontSize:13, fontWeight:tab===i?700:500, cursor:"pointer",
+                    border:"none", background:"transparent", whiteSpace:"nowrap",
+                    color:tab===i?C.amber:C.muted,
+                    borderBottom:tab===i?"2px solid "+C.amber:"2px solid transparent" }}>
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ maxWidth:1400, margin:"0 auto", padding:14 }}>
+              {tab === 0 && (
+                <Sheet1Tab inp={inp} s={s} c={c}
+                  s1Slots={s1Slots} s1Name={s1Name} setS1Name={setS1Name}
+                  saveS1={saveS1} loadS1={loadS1} copyS1={copyS1} />
+              )}
+              {tab === 1 && (
+                <Sheet2Tab inp={inp} s={s} c={c}
+                  tgtMode={tgtMode} setTgtMode={setTgtMode}
+                  tgtVal={tgtVal} setTgtVal={setTgtVal}
+                  chShow={chShow} setChShow={setChShow} />
+              )}
+              {tab === 2 && (
+                <Sheet3Tab inp={inp} s={s} c={c}
+                  s3Slots={s3Slots} setS3Slots={setS3Slots}
+                  s3Name={s3Name} setS3Name={setS3Name}
+                  s3AutoTarget={s3AutoTarget} setS3AutoTarget={setS3AutoTarget} />
+              )}
+              {tab === 3 && (
+                <Sheet4Tab inp={inp} s={s} comps={comps} setComps={setComps} />
+              )}
+            </div>
+
+          </div>
+        </FxCtx.Provider>
+      );
+    }
+
     // ── 렌더링을 관장하는 최상위 마스터 ──
     function AppMain() {
       return (
-        <div>
+        <SafeErrorBoundary>
           <App />
-        </div>
+        </SafeErrorBoundary>
       )
     }
 
